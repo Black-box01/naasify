@@ -1,0 +1,332 @@
+@import "tailwindcss";
+
+/* Class-based dark mode. `.dark` on <html> is set before paint by the theme
+   bootstrap script in app/layout.tsx (localStorage → OS prefers-color-scheme). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ---------------------------------------------------------------------------
+   Theme tokens — light (:root) and dark (.dark). Tailwind utilities
+   (bg-background, text-foreground, text-brand-300, ...) resolve through these
+   vars, so every surface, border and accent flips with the active theme.
+--------------------------------------------------------------------------- */
+:root {
+  --background: #f6f4fd;
+  --foreground: #17102b;
+  --surface: rgba(255, 255, 255, 0.7);
+  --surface-strong: rgba(255, 255, 255, 0.86);
+  --glass-border: rgba(124, 58, 237, 0.14);
+  --glass-border-strong: rgba(124, 58, 237, 0.2);
+
+  /* Brand (purple) — light shades darkened for contrast on a light bg */
+  --brand-50: #f4f2fe;
+  --brand-100: #ddd7fd;
+  --brand-200: #a78bfa;
+  --brand-300: #7c3aed;
+  --brand-400: #6d28d9;
+  --brand-500: #7c3aed;
+  --brand-600: #6d28d9;
+  --brand-700: #5b21b6;
+  --brand-800: #4c1d95;
+  --brand-900: #2e1065;
+
+  /* Accent (cyan) — light shades darkened for contrast on a light bg */
+  --accent-50: #ecfeff;
+  --accent-100: #cffafe;
+  --accent-200: #06b6d4;
+  --accent-300: #0891b2;
+  --accent-400: #0e7490;
+  --accent-500: #06b6d4;
+  --accent-600: #0891b2;
+  --accent-700: #0e7490;
+  --accent-800: #155e75;
+  --accent-900: #164e63;
+}
+
+.dark {
+  --background: #070312;
+  --foreground: #f4f2ff;
+  --surface: rgba(255, 255, 255, 0.05);
+  --surface-strong: rgba(13, 7, 30, 0.72);
+  --glass-border: rgba(167, 139, 250, 0.16);
+  --glass-border-strong: rgba(167, 139, 250, 0.22);
+
+  --brand-50: #f4f2fe;
+  --brand-100: #ddd7fd;
+  --brand-200: #ccc4fc;
+  --brand-300: #a78bfa;
+  --brand-400: #8b5cf6;
+  --brand-500: #7c3aed;
+  --brand-600: #6d28d9;
+  --brand-700: #5b21b6;
+  --brand-800: #4c1d95;
+  --brand-900: #2e1065;
+
+  --accent-50: #ecfeff;
+  --accent-100: #cffafe;
+  --accent-200: #a5f3fc;
+  --accent-300: #67e8f9;
+  --accent-400: #22d3ee;
+  --accent-500: #06b6d4;
+  --accent-600: #0891b2;
+  --accent-700: #0e7490;
+  --accent-800: #155e75;
+  --accent-900: #164e63;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  /* Brand Colors — Purple */
+  --color-brand-50: var(--brand-50);
+  --color-brand-100: var(--brand-100);
+  --color-brand-200: var(--brand-200);
+  --color-brand-300: var(--brand-300);
+  --color-brand-400: var(--brand-400);
+  --color-brand-500: var(--brand-500);
+  --color-brand-600: var(--brand-600);
+  --color-brand-700: var(--brand-700);
+  --color-brand-800: var(--brand-800);
+  --color-brand-900: var(--brand-900);
+
+  /* Brand Colors — Cyan */
+  --color-accent-50: var(--accent-50);
+  --color-accent-100: var(--accent-100);
+  --color-accent-200: var(--accent-200);
+  --color-accent-300: var(--accent-300);
+  --color-accent-400: var(--accent-400);
+  --color-accent-500: var(--accent-500);
+  --color-accent-600: var(--accent-600);
+  --color-accent-700: var(--accent-700);
+  --color-accent-800: var(--accent-800);
+  --color-accent-900: var(--accent-900);
+
+  /* Fonts (variables injected by next/font in app/layout.tsx) */
+  --font-sans: var(--font-inter);
+  --font-display: var(--font-jakarta);
+
+  /* Animations */
+  --animate-gradient-rotate: gradient-rotate 14s linear infinite;
+  --animate-blob-drift: blob-drift 18s ease-in-out infinite;
+  --animate-blob-drift-slow: blob-drift 26s ease-in-out infinite reverse;
+  --animate-float: float 7s ease-in-out infinite;
+  --animate-shimmer: shimmer 2.75s linear infinite;
+  --animate-fade-in-up: fade-in-up 0.7s ease-out both;
+  --animate-gradient-shift: gradient-shift 12s ease infinite;
+}
+
+/* Smooth scroll for anchor links */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Account for fixed header on anchor targets */
+section {
+  scroll-margin-top: 7rem;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* ---------------------------------------------------------------------------
+   2026 design-system utilities
+--------------------------------------------------------------------------- */
+
+/* Frosted glass container */
+.glass {
+  background: var(--surface);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+}
+
+.glass-strong {
+  background: var(--surface-strong);
+  backdrop-filter: blur(24px) saturate(140%);
+  -webkit-backdrop-filter: blur(24px) saturate(140%);
+  border: 1px solid var(--glass-border-strong);
+}
+
+/* Pill shape — navbar, buttons, inputs, badges */
+.pill {
+  border-radius: 9999px;
+}
+
+/* Layered purple/cyan-tinted shadow for cards and containers */
+.shadow-layered {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 8px 24px -8px rgba(124, 58, 237, 0.35),
+    0 24px 48px -24px rgba(6, 182, 212, 0.25);
+}
+
+.shadow-layered-lg {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 12px 32px -8px rgba(124, 58, 237, 0.45),
+    0 32px 64px -24px rgba(6, 182, 212, 0.35);
+}
+
+/* Purple → cyan headline gradient */
+.text-gradient {
+  background: linear-gradient(92deg, var(--brand-300) 0%, var(--brand-500) 35%, var(--accent-400) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Animated gradient background panel (hero / CTA sections) */
+.animated-gradient-bg {
+  background: linear-gradient(
+    120deg,
+    rgba(124, 58, 237, 0.55),
+    rgba(34, 211, 238, 0.4),
+    rgba(139, 92, 246, 0.5),
+    rgba(6, 182, 212, 0.45)
+  );
+  background-size: 300% 300%;
+  animation: gradient-shift 12s ease infinite;
+}
+
+/* Shine sweep for primary pill buttons */
+.btn-shine {
+  position: relative;
+  overflow: hidden;
+}
+.btn-shine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 40%,
+    rgba(255, 255, 255, 0.35) 50%,
+    transparent 60%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2.75s linear infinite;
+  pointer-events: none;
+}
+
+/* Performance: skip rendering off-screen sections until needed */
+.animate-on-scroll {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 500px;
+}
+
+/* Hide scrollbar utility */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* ---------------------------------------------------------------------------
+   Keyframes (compositor-friendly: transform / opacity / background-position)
+--------------------------------------------------------------------------- */
+
+@keyframes gradient-rotate {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes gradient-shift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes blob-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  33% {
+    transform: translate3d(6%, -8%, 0) scale(1.12);
+  }
+  66% {
+    transform: translate3d(-7%, 6%, 0) scale(0.94);
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-12px);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Accessibility
+--------------------------------------------------------------------------- */
+
+*:focus-visible {
+  outline: 2px solid #22d3ee;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+*:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Respect user motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+/* Custom cursor effect is pointer-device only */
+@media (pointer: coarse) {
+  .cursor-layer {
+    display: none !important;
+  }
+}
