@@ -5,7 +5,7 @@ import { CONTACT_EMAIL } from "@/lib/constants";
 
 const PRODUCT_LINKS = [
   { href: "/pricing", label: "Pricing" },
-  { href: "/#services", label: "Services" },
+  { href: "/services", label: "Services" },
   { href: "/contact", label: "Contact" },
 ];
 

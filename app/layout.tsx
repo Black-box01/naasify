@@ -1,6 +1,16 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
+import { SITE_NAME } from "@/lib/constants";
+import {
+  DEFAULT_KEYWORDS,
+  SEO_DESCRIPTION,
+  SITE_URL,
+  absoluteUrl,
+  organizationJsonLd,
+  websiteJsonLd,
+} from "@/lib/seo";
+import { JsonLd } from "@/components/seo/JsonLd";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -15,8 +25,6 @@ const jakarta = Plus_Jakarta_Sans({
   weight: ["500", "600", "700", "800"],
 });
 
-const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-
 /**
  * Runs before first paint: seeds the `.dark` class on <html> from the stored
  * preference (localStorage) or, on first visit, the OS `prefers-color-scheme`.
@@ -24,44 +32,74 @@ const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
  */
 const themeScript = `(function(){try{var r=document.documentElement;var s=localStorage.getItem("naasify-theme");var d=s?s==="dark":window.matchMedia("(prefers-color-scheme: dark)").matches;r.classList.toggle("dark",d);r.style.colorScheme=d?"dark":"light";}catch(e){}})();`;
 
+const googleVerification = process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION;
+
 export const metadata: Metadata = {
-  metadataBase: new URL(siteUrl),
+  metadataBase: new URL(SITE_URL),
+  applicationName: SITE_NAME,
   title: {
-    default: "NAASIFY — Backend-as-a-Service Marketplace",
-    template: "%s — NAASIFY",
+    default: `${SITE_NAME} — Backend-as-a-Service Marketplace`,
+    template: `%s — ${SITE_NAME}`,
   },
-  description:
-    "NAASIFY sells the cloud resources your product needs: backend & frontend hosting, SMTP emailing, databases, storage, domain names, cloud computing, VPS and VPN — one subscription, one dashboard.",
-  keywords: [
-    "backend as a service",
-    "cloud hosting",
-    "VPS",
-    "VPN",
-    "SMTP",
-    "database hosting",
-    "NAASIFY",
-  ],
+  description: SEO_DESCRIPTION,
+  keywords: DEFAULT_KEYWORDS,
+  authors: [{ name: SITE_NAME, url: SITE_URL }],
+  creator: SITE_NAME,
+  publisher: SITE_NAME,
+  category: "technology",
+  alternates: {
+    canonical: absoluteUrl("/"),
+  },
+  formatDetection: {
+    telephone: false,
+    address: false,
+    email: false,
+  },
   icons: {
     icon: "/icon.png",
+    shortcut: "/icon.png",
     apple: "/icon.png",
   },
   openGraph: {
-    title: "NAASIFY — Backend-as-a-Service Marketplace",
-    description:
-      "Hosting, databases, email, storage, domains, compute, VPS and VPN — one subscription.",
-    url: siteUrl,
-    siteName: "NAASIFY",
-    images: [{ url: "/logo.png", width: 178, height: 124, alt: "NAASIFY" }],
     type: "website",
+    locale: "en_US",
+    url: SITE_URL,
+    siteName: SITE_NAME,
+    title: `${SITE_NAME} — Backend-as-a-Service Marketplace`,
+    description: SEO_DESCRIPTION,
+    images: [{ url: "/logo.png", width: 178, height: 124, alt: SITE_NAME }],
   },
   twitter: {
-    card: "summary",
-    title: "NAASIFY — Backend-as-a-Service Marketplace",
-    description:
-      "Hosting, databases, email, storage, domains, compute, VPS and VPN — one subscription.",
+    card: "summary_large_image",
+    title: `${SITE_NAME} — Backend-as-a-Service Marketplace`,
+    description: SEO_DESCRIPTION,
     images: ["/logo.png"],
+    creator: "@naasify",
   },
-  robots: { index: true, follow: true },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
+  ...(googleVerification
+    ? { verification: { google: googleVerification } }
+    : {}),
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  colorScheme: "light dark",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f6f4fd" },
+    { media: "(prefers-color-scheme: dark)", color: "#070312" },
+  ],
 };
 
 export default function RootLayout({
@@ -75,6 +113,9 @@ export default function RootLayout({
     >
       <body className="antialiased">
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        {/* Sitewide entity graph: who publishes this site (AEO/SEO). */}
+        <JsonLd data={organizationJsonLd()} />
+        <JsonLd data={websiteJsonLd()} />
         <a
           href="#main-content"
           className="sr-only focus:not-sr-only focus:pill focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:bg-brand-500 focus:px-4 focus:py-2 focus:text-white"
