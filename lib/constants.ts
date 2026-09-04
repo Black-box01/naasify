@@ -2,7 +2,7 @@ import type { BillingCycle } from "@/lib/types";
 
 export const SITE_NAME = "NAASIFY";
 export const SITE_TAGLINE = "Everything your product needs to ship — one platform.";
-export const CONTACT_EMAIL = process.env.CONTACT_TO_EMAIL || "info@naasify.com";
+export const CONTACT_EMAIL = process.env.CONTACT_TO_EMAIL || "info@naasify.online";
 
 export const BILLING_CYCLES: BillingCycle[] = ["quarterly", "half_yearly", "annual"];
 

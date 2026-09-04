@@ -320,8 +320,8 @@ create policy contact_messages_delete_admin on public.naasify_contact_messages
 -- 2. Create your admin account through /signup on the app (or in Supabase
 --    Auth with "Auto Confirm User" enabled), then promote it:
 --      update public.naasify_profiles set role = 'admin' where email = 'you@example.com';
--- 3. Resend: verify the naasify.com domain (SPF/DKIM) so emails can be sent
---    from info@naasify.com. Until then use onboarding@resend.dev in
+-- 3. Resend: verify the naasify.online domain (SPF/DKIM) so emails can be sent
+--    from info@naasify.online. Until then use onboarding@resend.dev in
 --    RESEND_FROM_EMAIL for testing.
 -- 4. Paystack dashboard -> Settings -> Webhooks: set the URL to
 --    https://<your-domain>/api/webhooks/paystack and copy the secret into

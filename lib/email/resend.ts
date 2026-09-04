@@ -8,7 +8,7 @@ import { Resend } from "resend";
 const resendApiKey = process.env.RESEND_API_KEY || "";
 const resend = resendApiKey ? new Resend(resendApiKey) : null;
 
-const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "NAASIFY <info@naasify.com>";
+const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "NAASIFY <info@naasify.online>";
 
 export async function sendEmail({
   to,

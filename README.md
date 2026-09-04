@@ -8,7 +8,7 @@ highlighted middle **All-in-One** bundle (every service, seeded at **₦350,000 
 year**) — displayed in **USD by default** with a live NGN↔USD converter.
 Checkout is via **Paystack** (signed, idempotent webhook + callback
 verification), accounts are optional, and there is a role-gated admin panel plus
-a contact page that emails **info@naasify.com** via Resend.
+a contact page that emails **info@naasify.online** via Resend.
 
 **Design:** dark purple (`#7c3aed`) + cyan (`#06b6d4`), floating pill glass
 navbar, pill buttons, layered-shadow glass cards, animated gradient hero/CTA
@@ -75,8 +75,8 @@ feature to work; the app degrades gracefully where noted.
 | `PAYSTACK_SECRET_KEY`             | **server only**         | Live/test secret key; also the webhook HMAC secret            |
 | `PAYSTACK_PUBLIC_KEY`             | reference               | Public key (kept for completeness)                            |
 | `RESEND_API_KEY`                  | **server only**         | Missing key → emails skipped, contact still saves (`emailed:false`) |
-| `RESEND_FROM_EMAIL`               | **server only**         | Default `NAASIFY <info@naasify.com>`                          |
-| `CONTACT_TO_EMAIL`                | **server only**         | Inbox for contact messages (default `info@naasify.com`)       |
+| `RESEND_FROM_EMAIL`               | **server only**         | Default `NAASIFY <info@naasify.online>`                          |
+| `CONTACT_TO_EMAIL`                | **server only**         | Inbox for contact messages (default `info@naasify.online`)       |
 | `NEXT_PUBLIC_APP_URL`             | client + server         | Base URL for callback/redirect links                          |
 | `FX_FALLBACK_NGN_PER_USD`         | **server only**         | Fallback rate when the live FX API is unreachable (default 1500) |
 | `FX_API_URL`                      | **server only**         | Live USD→NGN rate endpoint                                    |
@@ -136,8 +136,8 @@ read published pricing but never the inbox.
 ## Resend (contact + receipt email)
 
 1. Create a Resend account and add a `RESEND_API_KEY`.
-2. **Verify the `naasify.com` domain** (SPF/DKIM) so mail can be sent from
-   `info@naasify.com`.
+2. **Verify the `naasify.online` domain** (SPF/DKIM) so mail can be sent from
+   `info@naasify.online`.
 3. **Until the domain is verified**, set `RESEND_FROM_EMAIL=onboarding@resend.dev`
    for testing — otherwise sends will be rejected.
 
@@ -255,7 +255,7 @@ and `api/webhooks` (so the Paystack signature body is never altered).
      `FX_*` / `CONTACT_TO_EMAIL` / `RESEND_FROM_EMAIL`.
 3. Update the Paystack webhook URL to
    `https://<your-production-domain>/api/webhooks/paystack`.
-4. Verify the `naasify.com` domain in Resend before going live.
+4. Verify the `naasify.online` domain in Resend before going live.
 
 ---
 

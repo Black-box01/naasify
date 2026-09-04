@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // 2) Notify info@naasify.com and confirm to the sender. Failures are logged
+  // 2) Notify info@naasify.online and confirm to the sender. Failures are logged
   //    but never block the success response.
   const [adminRes, confirmRes] = await Promise.all([
     sendEmail({

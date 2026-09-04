@@ -29,7 +29,7 @@ const FEATURES: { icon: IconName; title: string; body: string }[] = [
   {
     icon: "inbox",
     title: "Humans on support",
-    body: "Message us anytime at info@naasify.com and get a real engineer, not a chatbot loop.",
+    body: "Message us anytime at info@naasify.online and get a real engineer, not a chatbot loop.",
   },
 ];
 

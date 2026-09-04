@@ -7,7 +7,7 @@ import type { BillingCycle, CurrencyCode } from "@/lib/types";
  * reference local files, so the logo/site URLs are absolute from
  * NEXT_PUBLIC_APP_URL.
  */
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://naasify.com";
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://naasify.online";
 const LOGO_URL = `${APP_URL}/logo.png`;
 
 export const GRADIENTS = {
