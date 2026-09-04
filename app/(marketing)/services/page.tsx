@@ -3,14 +3,28 @@ import Link from "next/link";
 import { AnimatedGradient } from "@/components/effects/AnimatedGradient";
 import { ServicesGrid } from "@/components/home/ServicesGrid";
 import { Icon } from "@/components/ui/icons";
+import { JsonLd } from "@/components/seo/JsonLd";
 import { getActiveServices } from "@/lib/pricing";
-import { SITE_NAME } from "@/lib/constants";
+import { breadcrumbJsonLd, buildMetadata, servicesJsonLd } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: `Services — ${SITE_NAME}`,
+export const metadata: Metadata = buildMetadata({
+  title: "Services",
   description:
     "Hosting, databases, email, storage, domains, compute, VPS and VPN — every cloud service your product needs, on one NAASIFY subscription.",
-};
+  path: "/services",
+  keywords: [
+    "cloud services",
+    "backend hosting",
+    "frontend hosting",
+    "SMTP email",
+    "database hosting",
+    "cloud storage",
+    "domain names",
+    "cloud computing",
+    "VPS",
+    "VPN",
+  ],
+});
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +84,14 @@ export default async function ServicesPage() {
           </section>
         </>
       )}
+
+      <JsonLd data={servicesJsonLd(services)} />
+      <JsonLd
+        data={breadcrumbJsonLd([
+          { name: "Home", path: "/" },
+          { name: "Services", path: "/services" },
+        ])}
+      />
     </div>
   );
 }

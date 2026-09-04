@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { PricingCards, type ServicePlans } from "@/components/pricing/PricingCards";
 import { AnimatedGradient } from "@/components/effects/AnimatedGradient";
+import { JsonLd } from "@/components/seo/JsonLd";
 import {
   getActivePlans,
   getActiveServices,
@@ -8,14 +9,24 @@ import {
 } from "@/lib/pricing";
 import { getNgnPerUsd } from "@/lib/fx";
 import { getCurrentUser } from "@/lib/auth";
-import { BILLING_CYCLES, SITE_NAME } from "@/lib/constants";
+import { BILLING_CYCLES } from "@/lib/constants";
+import { breadcrumbJsonLd, buildMetadata, pricingJsonLd } from "@/lib/seo";
 import type { BillingCycle } from "@/lib/types";
 
-export const metadata: Metadata = {
-  title: `Pricing — ${SITE_NAME}`,
+export const metadata: Metadata = buildMetadata({
+  title: "Pricing",
   description:
-    "Transparent quarterly, half-yearly and annual pricing for every NAASIFY cloud service. View in USD or naira.",
-};
+    "Transparent quarterly, half-yearly and annual pricing for every NAASIFY cloud service. View in USD or naira — no hidden fees, cancel anytime.",
+  path: "/pricing",
+  keywords: [
+    "NAASIFY pricing",
+    "cloud service pricing",
+    "hosting plans",
+    "annual hosting",
+    "pay in naira",
+    "BaaS pricing",
+  ],
+});
 
 export default async function PricingPage({
   searchParams,
@@ -69,6 +80,14 @@ export default async function PricingPage({
           email={email}
         />
       </div>
+
+      <JsonLd data={pricingJsonLd([...bundles, ...plans])} />
+      <JsonLd
+        data={breadcrumbJsonLd([
+          { name: "Home", path: "/" },
+          { name: "Pricing", path: "/pricing" },
+        ])}
+      />
     </div>
   );
 }
