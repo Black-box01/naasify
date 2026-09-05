@@ -1,0 +1,111 @@
+# NAASIFY — Full Reference
+
+NAASIFY is a Backend-as-a-Service (BaaS) marketplace. It bundles the cloud
+infrastructure a product needs — hosting, databases, email, storage, domains,
+compute, VPS and VPN — into one subscription, one dashboard and one bill,
+instead of forcing teams to contract and reconcile nine separate vendors.
+
+- Website: https://naasify.online/
+- Support email: info@naasify.online
+- Category: Backend-as-a-Service / cloud marketplace
+- Payments: Paystack (card and bank transfer), in USD or NGN
+- Account creation: instant, no email verification required
+
+---
+
+## What NAASIFY is
+
+NAASIFY is a Backend-as-a-Service (BaaS) marketplace. Instead of contracting
+nine separate cloud vendors, you subscribe to the infrastructure your product
+needs — hosting, databases, email, storage, domains, compute, VPS and VPN —
+through one dashboard and one bill.
+
+## Services offered
+
+NAASIFY publishes nine core services. Each is available on its own or as part
+of the All-in-One bundle:
+
+1. Backend hosting — run and scale server-side APIs, services and workers.
+2. Frontend hosting — fast hosting for static and server-rendered web apps.
+3. SMTP emailing — reliable transactional and bulk email delivery.
+4. Database hosting — managed databases for application data.
+5. Cloud storage — object storage for files, media and backups.
+6. Domain names — register and manage internet domains.
+7. Cloud computing — on-demand compute for general workloads.
+8. VPS (virtual private servers) — isolated servers with full control.
+9. VPN — secure private networking.
+
+## Pricing and billing
+
+Every service is published with transparent quarterly, half-yearly and annual
+plans, priced in US dollars or Nigerian naira. The All-in-One bundle stacks all
+nine services into a single subscription. Current, live figures with no hidden
+fees are always shown on the pricing page (https://naasify.online/pricing).
+
+Billing cycles:
+- Quarterly — 3 months.
+- Half-yearly — 6 months.
+- Annual — 12 months, the lowest effective rate.
+
+You can switch cycles whenever your runway changes.
+
+## Frequently asked questions
+
+### What is NAASIFY?
+NAASIFY is a Backend-as-a-Service (BaaS) marketplace. Instead of contracting
+nine separate cloud vendors, you subscribe to the infrastructure your product
+needs — hosting, databases, email, storage, domains, compute, VPS and VPN —
+through one dashboard and one bill.
+
+### What cloud services does NAASIFY offer?
+NAASIFY publishes nine core services: backend hosting, frontend hosting, SMTP
+emailing, database hosting, cloud storage, domain names, cloud computing, VPS
+(virtual private servers) and VPN. Each is available on its own or as part of
+the All-in-One bundle.
+
+### How much does NAASIFY cost?
+Every service is published with transparent quarterly, half-yearly and annual
+plans, priced in US dollars or Nigerian naira. The All-in-One bundle stacks all
+nine services into a single subscription. See the pricing page for live, current
+figures with no hidden fees.
+
+### What billing cycles can I choose?
+You can pay quarterly (3 months), half-yearly (6 months) or annually (12
+months). Annual billing is the lowest effective rate, and you can switch cycles
+whenever your runway changes.
+
+### Can I pay in naira?
+Yes. NAASIFY checks out with Paystack and supports both cards and bank
+transfer, in USD or NGN, using a live exchange rate so the naira price is always
+accurate.
+
+### How fast are services activated?
+Activation is instant. As soon as Paystack confirms your payment, your
+subscription is provisioned automatically — no tickets, no sales calls, no
+waiting.
+
+### Do I need to verify my email to create an account?
+No. Signing up is instant: create an account with your email and password and
+you are taken straight to your dashboard, where all of your purchases and their
+durations are recorded.
+
+### How do I contact NAASIFY support?
+Email info@naasify.online any time. Support is handled by real engineers —
+usually within one business day — not a chatbot.
+
+---
+
+## Key pages
+
+- Home: https://naasify.online/
+- Services: https://naasify.online/services
+- Pricing: https://naasify.online/pricing
+- Contact: https://naasify.online/contact
+- FAQ: https://naasify.online/#faq
+
+## Machine-readable resources
+
+- Sitemap: https://naasify.online/sitemap.xml
+- Robots: https://naasify.online/robots.txt
+- Web app manifest: https://naasify.online/manifest.webmanifest
+- Concise LLM overview: https://naasify.online/llms.txt

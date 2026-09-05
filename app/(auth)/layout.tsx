@@ -1,11 +1,18 @@
 import type { Metadata } from "next";
 import { AnimatedGradient } from "@/components/effects/AnimatedGradient";
+import { SITE_NAME } from "@/lib/constants";
 
+/**
+ * Auth pages are crawlable (so this tag is actually read) but kept out of the
+ * index — thin, private entry points rather than content we want ranking.
+ */
 export const metadata: Metadata = {
   title: {
-    default: "Sign in — NAASIFY",
-    template: "%s — NAASIFY",
+    default: `Sign in — ${SITE_NAME}`,
+    template: `%s — ${SITE_NAME}`,
   },
+  description: `Sign in or create your ${SITE_NAME} account — instant access, no email verification required.`,
+  robots: { index: false, follow: false },
 };
 
 export default function AuthLayout({

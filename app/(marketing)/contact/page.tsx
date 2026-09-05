@@ -3,12 +3,21 @@ import Link from "next/link";
 import { ContactForm } from "@/components/ContactForm";
 import { AnimatedGradient } from "@/components/effects/AnimatedGradient";
 import { Icon } from "@/components/ui/icons";
-import { CONTACT_EMAIL, SITE_NAME } from "@/lib/constants";
+import { JsonLd } from "@/components/seo/JsonLd";
+import { CONTACT_EMAIL } from "@/lib/constants";
+import { breadcrumbJsonLd, buildMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: `Contact — ${SITE_NAME}`,
-  description: `Questions about NAASIFY plans or a custom bundle? Email ${CONTACT_EMAIL} or send us a message.`,
-};
+export const metadata: Metadata = buildMetadata({
+  title: "Contact",
+  description: `Questions about NAASIFY plans or a custom bundle? Email ${CONTACT_EMAIL} or send us a message — real humans, usually within one business day.`,
+  path: "/contact",
+  keywords: [
+    "contact NAASIFY",
+    "NAASIFY support",
+    "cloud service support",
+    "custom cloud bundle",
+  ],
+});
 
 export default function ContactPage() {
   return (
@@ -89,6 +98,13 @@ export default function ContactPage() {
           </div>
         </aside>
       </section>
+
+      <JsonLd
+        data={breadcrumbJsonLd([
+          { name: "Home", path: "/" },
+          { name: "Contact", path: "/contact" },
+        ])}
+      />
     </div>
   );
 }

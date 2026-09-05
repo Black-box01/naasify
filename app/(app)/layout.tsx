@@ -1,5 +1,16 @@
+import type { Metadata } from "next";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
+import { SITE_NAME } from "@/lib/constants";
+
+/** Authenticated app area is private — never indexed. */
+export const metadata: Metadata = {
+  title: {
+    default: `Dashboard — ${SITE_NAME}`,
+    template: `%s — ${SITE_NAME}`,
+  },
+  robots: { index: false, follow: false },
+};
 
 /**
  * Authenticated app chrome (dashboard). Same floating navbar + footer as the

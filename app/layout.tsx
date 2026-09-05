@@ -4,6 +4,7 @@ import "./globals.css";
 import { SITE_NAME } from "@/lib/constants";
 import {
   DEFAULT_KEYWORDS,
+  OG_IMAGE,
   SEO_DESCRIPTION,
   SITE_URL,
   absoluteUrl,
@@ -67,13 +68,13 @@ export const metadata: Metadata = {
     siteName: SITE_NAME,
     title: `${SITE_NAME} — Backend-as-a-Service Marketplace`,
     description: SEO_DESCRIPTION,
-    images: [{ url: "/logo.png", width: 178, height: 124, alt: SITE_NAME }],
+    images: [OG_IMAGE],
   },
   twitter: {
     card: "summary_large_image",
     title: `${SITE_NAME} — Backend-as-a-Service Marketplace`,
     description: SEO_DESCRIPTION,
-    images: ["/logo.png"],
+    images: [OG_IMAGE.url],
     creator: "@naasify",
   },
   robots: {

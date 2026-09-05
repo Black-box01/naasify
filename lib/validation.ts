@@ -45,3 +45,36 @@ export const messageStatusSchema = z.object({
 export const orderStatusSchema = z.object({
   status: z.enum(["pending", "paid", "failed", "refunded"]),
 });
+
+export const buildStatusSchema = z.object({
+  status: z.enum(["pending", "processing", "completed"]),
+});
+
+/** User -> admin support message (conversation_id is derived from the session). */
+export const supportMessageSchema = z.object({
+  message_text: z.string().min(1, "Message is empty").max(4000, "Message is too long"),
+});
+
+/** Admin -> user reply; notify_user toggles the optional email to the user. */
+export const supportReplySchema = z.object({
+  message_text: z.string().min(1, "Message is empty").max(4000, "Message is too long"),
+  notify_user: z.boolean().optional(),
+});
+
+/**
+ * Admin-authored blog post. `body_html` is trusted (only admins can write) and
+ * rendered inside the `.blog-prose` container. `published_at` accepts an ISO or
+ * datetime-local string and is normalised to a timestamp in the API route.
+ */
+export const blogPostSchema = z.object({
+  title: z.string().min(2, "Title is too short").max(160),
+  slug: z.string().min(2).max(160).optional(),
+  excerpt: z.string().max(400).optional(),
+  body_html: z.string().max(200_000).optional(),
+  cover_image_url: z.string().max(600).optional(),
+  tags: z.array(z.string().max(40)).max(20).optional(),
+  status: z.enum(["draft", "published"]).optional(),
+  published_at: z.string().max(64).nullable().optional(),
+});
+export type BlogPostInput = z.infer<typeof blogPostSchema>;
+export const blogPostUpdateSchema = blogPostSchema.partial();

@@ -79,6 +79,8 @@ export interface Subscription {
   status: SubscriptionStatus;
   starts_at: string;
   ends_at: string;
+  /** When the expiry cron last emailed a renewal reminder (dedupe marker). */
+  expiry_notified_at: string | null;
   created_at: string;
   plan?: Plan;
 }
@@ -94,4 +96,68 @@ export interface ContactMessage {
   status: MessageStatus;
   email_sent: boolean;
   created_at: string;
+}
+
+export type BuildStatus = "pending" | "processing" | "completed";
+
+/** A user-uploaded project build (zip/files) staged in the user-builds bucket. */
+export interface UserBuild {
+  id: string;
+  user_id: string;
+  file_name: string;
+  /** Storage object path: "{user_id}/{file_name}". */
+  file_key: string;
+  /** bigint arrives as a string from Supabase */
+  file_size: string;
+  mime_type: string | null;
+  status: BuildStatus;
+  uploaded_at: string;
+  updated_at: string;
+  /** Joined uploader (admin builds table). */
+  user?: Pick<Profile, "id" | "email" | "full_name"> | null;
+}
+
+/** One chat message in a user <-> admin support thread. */
+export interface SupportMessage {
+  id: string;
+  /** The non-admin participant's user id (stable thread key). */
+  conversation_id: string;
+  sender_id: string;
+  receiver_id: string | null;
+  message_text: string;
+  is_read: boolean;
+  created_at: string;
+}
+
+/** Admin inbox row: a user thread with its participant + unread aggregate. */
+export interface SupportConversation {
+  conversation_id: string;
+  user: Pick<Profile, "id" | "email" | "full_name"> | null;
+  last_message: SupportMessage;
+  unread_count: number;
+}
+
+export type BlogPostStatus = "draft" | "published";
+
+/** A blog/content post authored in the admin CMS. */
+export interface BlogPost {
+  id: string;
+  slug: string;
+  title: string;
+  excerpt: string | null;
+  /** Trusted, admin-authored HTML rendered inside the `.blog-prose` container. */
+  body_html: string;
+  cover_image_url: string | null;
+  tags: string[];
+  author_id: string | null;
+  status: BlogPostStatus;
+  /** Null until published; may be a future date to schedule release. */
+  published_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** A blog post joined with its author profile (public + admin views). */
+export interface BlogPostWithAuthor extends BlogPost {
+  author?: Pick<Profile, "id" | "full_name" | "email"> | null;
 }

@@ -1,0 +1,42 @@
+# NAASIFY
+
+> NAASIFY is a Backend-as-a-Service (BaaS) marketplace that bundles cloud hosting, databases, SMTP email, storage, domain names, cloud computing, VPS and VPN into simple quarterly, half-yearly and annual plans — with instant activation, USD or naira payments via Paystack, and 24/7 human support.
+
+Instead of contracting nine separate cloud vendors, you subscribe to the infrastructure your product needs through one dashboard and one bill. Services are provisioned automatically the moment Paystack confirms payment — no tickets, no sales calls, no waiting. Creating an account is instant and requires no email verification, and every purchase and its duration is recorded in your dashboard.
+
+## Services
+
+NAASIFY offers nine core cloud services, each available standalone or together in the All-in-One bundle:
+
+- Backend hosting: run and scale server-side APIs and workers.
+- Frontend hosting: fast static and SSR hosting for web apps.
+- SMTP emailing: transactional and bulk email delivery.
+- Database hosting: managed databases for your applications.
+- Cloud storage: object storage for files, media and backups.
+- Domain names: register and manage domains.
+- Cloud computing: on-demand compute for general workloads.
+- VPS: virtual private servers with full control.
+- VPN: secure private networking.
+
+## Pricing
+
+- Billing cycles: quarterly (3 months), half-yearly (6 months) and annual (12 months). Annual is the lowest effective rate.
+- Currencies: US dollars (USD) and Nigerian naira (NGN), converted with a live exchange rate.
+- Payments: Paystack — card and bank transfer.
+- No hidden fees; cancel anytime. Live, current figures are always shown on the pricing page.
+
+## Pages
+
+- [Home](https://naasify.online/): Platform overview, services, features and frequently asked questions.
+- [Services](https://naasify.online/services): All nine cloud services in detail.
+- [Pricing](https://naasify.online/pricing): Live plans and pricing, viewable in USD or naira and by billing cycle.
+- [Contact](https://naasify.online/contact): Support and custom-bundle enquiries.
+
+## Support
+
+- Email: info@naasify.online
+- Response time: usually within one business day, handled by real engineers rather than a chatbot.
+
+## FAQ
+
+Concise, direct answers to common questions about what NAASIFY is, its services, pricing, billing cycles, naira payments, activation speed, sign-up and support are on the home page (https://naasify.online/#faq). Full answers are also provided in /llms-full.txt.

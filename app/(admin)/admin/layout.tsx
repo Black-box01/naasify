@@ -1,7 +1,18 @@
+import type { Metadata } from "next";
 import Image from "next/image";
 import { requireAdmin } from "@/lib/auth";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { SignOutButton } from "@/components/SignOutButton";
+import { SITE_NAME } from "@/lib/constants";
+
+/** Admin console is private — never indexed. */
+export const metadata: Metadata = {
+  title: {
+    default: `Admin — ${SITE_NAME}`,
+    template: `%s — ${SITE_NAME}`,
+  },
+  robots: { index: false, follow: false },
+};
 
 /**
  * Admin shell. `requireAdmin()` redirects signed-out users to /login and

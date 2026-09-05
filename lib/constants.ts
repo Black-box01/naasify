@@ -1,4 +1,4 @@
-import type { BillingCycle } from "@/lib/types";
+import type { BillingCycle, BuildStatus } from "@/lib/types";
 
 export const SITE_NAME = "NAASIFY";
 export const SITE_TAGLINE = "Everything your product needs to ship — one platform.";
@@ -17,4 +17,16 @@ export const CYCLE_MONTHS: Record<BillingCycle, number> = {
   quarterly: 3,
   half_yearly: 6,
   annual: 12,
+};
+
+/** Private Supabase Storage bucket for user project builds. */
+export const BUILDS_BUCKET = "user-builds";
+
+/** Days before ends_at that the expiry cron starts sending renewal reminders. */
+export const EXPIRY_WARNING_DAYS = 7;
+
+export const BUILD_STATUS_LABELS: Record<BuildStatus, string> = {
+  pending: "Pending",
+  processing: "Processing",
+  completed: "Deployed",
 };

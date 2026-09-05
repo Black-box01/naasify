@@ -105,9 +105,16 @@ create table if not exists public.naasify_subscriptions (
   status text not null default 'active' check (status in ('active', 'expired', 'cancelled')),
   starts_at timestamptz not null default now(),
   ends_at timestamptz not null,
+  -- Set by the expiry cron the first time a renewal reminder is emailed, so a
+  -- user is notified once per window instead of daily for 7 straight days.
+  expiry_notified_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- Migration for databases created before expiry tracking existed.
+alter table public.naasify_subscriptions
+  add column if not exists expiry_notified_at timestamptz;
 
 -- ----------------------------------------------------------------------------
 -- Paystack webhook events (event_id PK = hard idempotency against retries)
@@ -137,6 +144,58 @@ create table if not exists public.naasify_contact_messages (
 );
 
 -- ----------------------------------------------------------------------------
+-- User builds (project archives uploaded from the dashboard; admin deploys them)
+-- ----------------------------------------------------------------------------
+create table if not exists public.naasify_user_builds (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  file_name text not null,
+  -- Storage object path inside the private "user-builds" bucket: "{user_id}/{file_name}".
+  file_key text not null,
+  file_size bigint not null default 0,
+  mime_type text,
+  status text not null default 'pending' check (status in ('pending', 'processing', 'completed')),
+  uploaded_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- ----------------------------------------------------------------------------
+-- Support messages (real-time user <-> admin chat)
+-- conversation_id is the non-admin participant's user id, so each user keeps one
+-- continuous thread with the admin team and admins can group by conversation.
+-- ----------------------------------------------------------------------------
+create table if not exists public.naasify_support_messages (
+  id uuid primary key default gen_random_uuid(),
+  conversation_id uuid not null,
+  sender_id uuid not null references auth.users (id) on delete cascade,
+  receiver_id uuid references auth.users (id) on delete set null,
+  message_text text not null,
+  is_read boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+-- ----------------------------------------------------------------------------
+-- Blog posts (SEO/AEO content marketing; authored in the admin CMS)
+-- author_id references naasify_profiles (same uuid as auth.users) so the
+-- author can be embedded as a join; it nulls out if the profile is removed.
+-- ----------------------------------------------------------------------------
+create table if not exists public.naasify_blog_posts (
+  id uuid primary key default gen_random_uuid(),
+  slug text not null unique,
+  title text not null,
+  excerpt text,
+  body_html text not null default '',
+  cover_image_url text,
+  tags text[] not null default '{}',
+  author_id uuid references public.naasify_profiles (id) on delete set null,
+  status text not null default 'draft' check (status in ('draft', 'published')),
+  -- Set when the post goes live (or a future date to schedule publication).
+  published_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- ----------------------------------------------------------------------------
 -- Indexes
 -- ----------------------------------------------------------------------------
 create index if not exists services_active_sort_idx on public.naasify_services (is_active, sort_order);
@@ -147,6 +206,14 @@ create index if not exists orders_status_created_idx on public.naasify_orders (s
 create index if not exists subscriptions_user_status_idx on public.naasify_subscriptions (user_id, status);
 create index if not exists contact_messages_status_created_idx on public.naasify_contact_messages (status, created_at desc);
 create index if not exists profiles_admin_idx on public.naasify_profiles (role) where role = 'admin';
+create index if not exists subscriptions_ends_at_active_idx on public.naasify_subscriptions (ends_at) where status = 'active';
+create index if not exists user_builds_user_uploaded_idx on public.naasify_user_builds (user_id, uploaded_at desc);
+create index if not exists user_builds_status_idx on public.naasify_user_builds (status, uploaded_at desc);
+create index if not exists support_messages_conversation_created_idx on public.naasify_support_messages (conversation_id, created_at desc);
+create index if not exists support_messages_unread_idx on public.naasify_support_messages (conversation_id) where is_read = false;
+-- slug lookups are served by the unique constraint on naasify_blog_posts.slug.
+create index if not exists blog_posts_status_published_idx on public.naasify_blog_posts (status, published_at desc);
+create index if not exists blog_posts_published_at_idx on public.naasify_blog_posts (published_at desc) where status = 'published';
 
 -- ----------------------------------------------------------------------------
 -- updated_at maintenance
@@ -176,6 +243,12 @@ create trigger orders_set_updated_at before update on public.naasify_orders
 drop trigger if exists subscriptions_set_updated_at on public.naasify_subscriptions;
 create trigger subscriptions_set_updated_at before update on public.naasify_subscriptions
   for each row execute function public.set_updated_at();
+drop trigger if exists user_builds_set_updated_at on public.naasify_user_builds;
+create trigger user_builds_set_updated_at before update on public.naasify_user_builds
+  for each row execute function public.set_updated_at();
+drop trigger if exists blog_posts_set_updated_at on public.naasify_blog_posts;
+create trigger blog_posts_set_updated_at before update on public.naasify_blog_posts
+  for each row execute function public.set_updated_at();
 
 -- ----------------------------------------------------------------------------
 -- Role helper (SECURITY DEFINER avoids RLS recursion inside policies)
@@ -200,6 +273,9 @@ alter table public.naasify_orders enable row level security;
 alter table public.naasify_subscriptions enable row level security;
 alter table public.naasify_paystack_events enable row level security;
 alter table public.naasify_contact_messages enable row level security;
+alter table public.naasify_user_builds enable row level security;
+alter table public.naasify_support_messages enable row level security;
+alter table public.naasify_blog_posts enable row level security;
 
 -- profiles -------------------------------------------------------------------
 drop policy if exists profiles_select_own_or_admin on public.naasify_profiles;
@@ -314,6 +390,145 @@ create policy contact_messages_delete_admin on public.naasify_contact_messages
   for delete to authenticated
   using (public.naasify_is_admin());
 
+-- user_builds ----------------------------------------------------------------
+drop policy if exists user_builds_select_own_or_admin on public.naasify_user_builds;
+create policy user_builds_select_own_or_admin on public.naasify_user_builds
+  for select to authenticated
+  using (user_id = auth.uid() or public.naasify_is_admin());
+
+drop policy if exists user_builds_insert_own on public.naasify_user_builds;
+create policy user_builds_insert_own on public.naasify_user_builds
+  for insert to authenticated
+  with check (user_id = auth.uid());
+
+-- Only admins move a build through pending -> processing -> completed.
+drop policy if exists user_builds_update_admin on public.naasify_user_builds;
+create policy user_builds_update_admin on public.naasify_user_builds
+  for update to authenticated
+  using (public.naasify_is_admin())
+  with check (public.naasify_is_admin());
+
+drop policy if exists user_builds_delete_own_or_admin on public.naasify_user_builds;
+create policy user_builds_delete_own_or_admin on public.naasify_user_builds
+  for delete to authenticated
+  using (user_id = auth.uid() or public.naasify_is_admin());
+
+-- support_messages -----------------------------------------------------------
+-- A user sees/edits only their own thread; admins see and manage everything.
+drop policy if exists support_messages_select_participant_or_admin on public.naasify_support_messages;
+create policy support_messages_select_participant_or_admin on public.naasify_support_messages
+  for select to authenticated
+  using (
+    conversation_id = auth.uid()
+    or sender_id = auth.uid()
+    or receiver_id = auth.uid()
+    or public.naasify_is_admin()
+  );
+
+drop policy if exists support_messages_insert_participant_or_admin on public.naasify_support_messages;
+create policy support_messages_insert_participant_or_admin on public.naasify_support_messages
+  for insert to authenticated
+  with check (
+    sender_id = auth.uid()
+    and (conversation_id = auth.uid() or public.naasify_is_admin())
+  );
+
+-- Read receipts: a participant (or admin) may flip is_read on their thread.
+drop policy if exists support_messages_update_participant_or_admin on public.naasify_support_messages;
+create policy support_messages_update_participant_or_admin on public.naasify_support_messages
+  for update to authenticated
+  using (conversation_id = auth.uid() or public.naasify_is_admin())
+  with check (conversation_id = auth.uid() or public.naasify_is_admin());
+
+drop policy if exists support_messages_delete_admin on public.naasify_support_messages;
+create policy support_messages_delete_admin on public.naasify_support_messages
+  for delete to authenticated
+  using (public.naasify_is_admin());
+
+-- blog_posts -----------------------------------------------------------------
+-- Anyone (anon or signed-in) can read published posts; admins read every post
+-- including drafts. Only admins may create, update or delete.
+drop policy if exists blog_posts_select_public on public.naasify_blog_posts;
+create policy blog_posts_select_public on public.naasify_blog_posts
+  for select to anon, authenticated
+  using (status = 'published' or public.naasify_is_admin());
+
+drop policy if exists blog_posts_insert_admin on public.naasify_blog_posts;
+create policy blog_posts_insert_admin on public.naasify_blog_posts
+  for insert to authenticated
+  with check (public.naasify_is_admin());
+
+drop policy if exists blog_posts_update_admin on public.naasify_blog_posts;
+create policy blog_posts_update_admin on public.naasify_blog_posts
+  for update to authenticated
+  using (public.naasify_is_admin())
+  with check (public.naasify_is_admin());
+
+drop policy if exists blog_posts_delete_admin on public.naasify_blog_posts;
+create policy blog_posts_delete_admin on public.naasify_blog_posts
+  for delete to authenticated
+  using (public.naasify_is_admin());
+
+-- ----------------------------------------------------------------------------
+-- Storage: private "user-builds" bucket, objects namespaced as {user_id}/...
+-- ----------------------------------------------------------------------------
+-- 100 MB per object; the bucket stays private (admin downloads via signed URL).
+insert into storage.buckets (id, name, public, file_size_limit)
+values ('user-builds', 'user-builds', false, 104857600)
+on conflict (id) do update set public = false, file_size_limit = 104857600;
+
+drop policy if exists user_builds_storage_select on storage.objects;
+create policy user_builds_storage_select on storage.objects
+  for select to authenticated
+  using (
+    bucket_id = 'user-builds'
+    and ((storage.foldername(name))[1] = auth.uid()::text or public.naasify_is_admin())
+  );
+
+drop policy if exists user_builds_storage_insert on storage.objects;
+create policy user_builds_storage_insert on storage.objects
+  for insert to authenticated
+  with check (
+    bucket_id = 'user-builds'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+drop policy if exists user_builds_storage_update on storage.objects;
+create policy user_builds_storage_update on storage.objects
+  for update to authenticated
+  using (
+    bucket_id = 'user-builds'
+    and ((storage.foldername(name))[1] = auth.uid()::text or public.naasify_is_admin())
+  )
+  with check (
+    bucket_id = 'user-builds'
+    and ((storage.foldername(name))[1] = auth.uid()::text or public.naasify_is_admin())
+  );
+
+drop policy if exists user_builds_storage_delete on storage.objects;
+create policy user_builds_storage_delete on storage.objects
+  for delete to authenticated
+  using (
+    bucket_id = 'user-builds'
+    and ((storage.foldername(name))[1] = auth.uid()::text or public.naasify_is_admin())
+  );
+
+-- ----------------------------------------------------------------------------
+-- Realtime: stream support_messages inserts/updates to the chat clients.
+-- ----------------------------------------------------------------------------
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'naasify_support_messages'
+  ) then
+    alter publication supabase_realtime add table public.naasify_support_messages;
+  end if;
+end
+$$;
+
 -- ============================================================================
 -- IMPORTANT: MANUAL STEPS AFTER RUNNING THIS FILE
 -- 1. Run supabase/seed.sql next (services + plans + the All-in-One bundle).
@@ -326,4 +541,8 @@ create policy contact_messages_delete_admin on public.naasify_contact_messages
 -- 4. Paystack dashboard -> Settings -> Webhooks: set the URL to
 --    https://<your-domain>/api/webhooks/paystack and copy the secret into
 --    PAYSTACK_SECRET_KEY (the signature is HMAC-SHA512 of the raw body).
+-- 5. The "user-builds" storage bucket and the support_messages realtime
+--    publication are created automatically above (nothing manual needed).
+-- 6. Expiry cron: deploy the daily job (vercel.json -> /api/cron/expiring) and
+--    set CRON_SECRET; Vercel calls it with "Authorization: Bearer <CRON_SECRET>".
 -- ============================================================================

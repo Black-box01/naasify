@@ -4,22 +4,28 @@ import { requireUser } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { SignOutButton } from "@/components/SignOutButton";
 import { BuyButton } from "@/components/pricing/BuyButton";
+import { ExpiryBanner } from "@/components/dashboard/ExpiryBanner";
+import { UploadBuild } from "@/components/dashboard/UploadBuild";
+import { BuildsList } from "@/components/dashboard/BuildsList";
+import { SupportChat } from "@/components/dashboard/SupportChat";
 import { Badge } from "@/components/ui/Badge";
 import { Icon } from "@/components/ui/icons";
 import { formatMoney } from "@/lib/money";
-import { CYCLE_LABELS, SITE_NAME } from "@/lib/constants";
+import { CYCLE_LABELS } from "@/lib/constants";
+import { daysUntil } from "@/lib/utils";
 import type {
   CurrencyCode,
   Order,
   OrderStatus,
   Subscription,
   SubscriptionStatus,
+  UserBuild,
 } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: `Dashboard — ${SITE_NAME}`,
+  title: "Dashboard",
 };
 
 const ORDER_TONE: Record<OrderStatus, "success" | "warning" | "danger" | "neutral"> = {
@@ -44,7 +50,7 @@ export default async function DashboardPage() {
   const { user, profile } = await requireUser();
   const supabase = createServiceClient();
 
-  const [subsRes, ordersRes] = await Promise.all([
+  const [subsRes, ordersRes, buildsRes] = await Promise.all([
     supabase
       .from("naasify_subscriptions")
       .select("*, plan:naasify_plans(*)")
@@ -55,12 +61,23 @@ export default async function DashboardPage() {
       .select("*, plan:naasify_plans(*)")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false }),
+    supabase
+      .from("naasify_user_builds")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("uploaded_at", { ascending: false }),
   ]);
 
   const subscriptions = (subsRes.data ?? []) as Subscription[];
   const orders = (ordersRes.data ?? []) as Order[];
+  const builds = (buildsRes.data ?? []) as UserBuild[];
   const activeSubs = subscriptions.filter((s) => s.status === "active");
   const displayName = profile?.full_name || user.email || "there";
+
+  // Soonest-expiring active plan drives the colour-coded countdown banner.
+  const soonestExpiring = [...activeSubs].sort(
+    (a, b) => new Date(a.ends_at).getTime() - new Date(b.ends_at).getTime(),
+  )[0];
 
   return (
     <div>
@@ -82,6 +99,14 @@ export default async function DashboardPage() {
           <SignOutButton />
         </div>
       </header>
+
+      {soonestExpiring && (
+        <ExpiryBanner
+          planName={soonestExpiring.plan?.name ?? "Subscription"}
+          endsAt={soonestExpiring.ends_at}
+          daysLeft={daysUntil(soonestExpiring.ends_at)}
+        />
+      )}
 
       {/* Active subscriptions */}
       <section className="mt-12">
@@ -139,6 +164,23 @@ export default async function DashboardPage() {
             ))}
           </div>
         )}
+      </section>
+
+      {/* Project builds */}
+      <section className="mt-14">
+        <h2 className="font-display text-lg font-bold text-foreground">Project builds</h2>
+        <p className="mt-1 text-sm text-foreground/50">
+          Upload a zip of your build — we&apos;ll review and deploy it for you.
+        </p>
+        <div className="mt-4">
+          <UploadBuild userId={user.id} />
+        </div>
+        <BuildsList builds={builds} />
+      </section>
+
+      {/* Support chat */}
+      <section className="mt-14">
+        <SupportChat userId={user.id} />
       </section>
 
       {/* Order history */}

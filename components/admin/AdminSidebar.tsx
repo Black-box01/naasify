@@ -12,7 +12,10 @@ const NAV: { href: string; label: string; icon: IconName; exact?: boolean }[] = 
   { href: "/admin/services", label: "Services", icon: "layers" },
   { href: "/admin/plans", label: "Plans", icon: "tag" },
   { href: "/admin/orders", label: "Orders", icon: "credit-card" },
+  { href: "/admin/builds", label: "Builds", icon: "box" },
   { href: "/admin/messages", label: "Messages", icon: "inbox" },
+  { href: "/admin/support", label: "Support", icon: "message-circle" },
+  { href: "/admin/blog", label: "Blog", icon: "book-open" },
 ];
 
 /** Admin pill sidebar (desktop) / horizontal pill bar (mobile). */

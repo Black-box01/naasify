@@ -45,6 +45,19 @@ export function absoluteUrl(path = "/"): string {
   return `${SITE_URL}${path.startsWith("/") ? "" : "/"}${path}`;
 }
 
+/**
+ * The generated 1200×630 social card (see app/opengraph-image.tsx). Referenced
+ * explicitly so every page — including those that override `openGraph` — shares
+ * one rich social image instead of falling back to the small logo or nothing.
+ */
+export const OG_IMAGE = {
+  url: absoluteUrl("/opengraph-image"),
+  width: 1200,
+  height: 630,
+  alt: `${SITE_NAME} — Backend-as-a-Service Marketplace`,
+  type: "image/png" as const,
+};
+
 export interface PageSeo {
   /** Short page title — the root "%s — NAASIFY" template appends the brand. */
   title: string;
@@ -79,11 +92,13 @@ export function buildMetadata({
       title: fullTitle,
       description,
       locale: SITE_LOCALE,
+      images: [OG_IMAGE],
     },
     twitter: {
       card: "summary_large_image",
       title: fullTitle,
       description,
+      images: [OG_IMAGE.url],
     },
     robots: noIndex
       ? { index: false, follow: false }
@@ -147,8 +162,38 @@ export const FAQ_ITEMS: FaqItem[] = [
       "No. Signing up is instant: create an account with your email and password and you are taken straight to your dashboard, where all of your purchases and their durations are recorded.",
   },
   {
+    question: "How do I manage my subscription?",
+    answer:
+      "From your NAASIFY dashboard. Every purchase is listed with its plan, billing cycle, start date and expiry date, so you can see exactly what is active, when it renews and what it cost — all in one place, with no need to contact support.",
+  },
+  {
+    question: "What happens when my subscription expires?",
+    answer:
+      "NAASIFY emails you a renewal reminder seven days before a subscription ends. If it lapses, the service is marked expired in your dashboard and you can renew at any time by checking out again — your data and settings are preserved.",
+  },
+  {
+    question: "Who can access the NAASIFY admin dashboard?",
+    answer:
+      "Only team members whose profile role is set to admin. The admin console at /admin is protected three ways — the page layout, the middleware proxy and every /api/admin route all re-check the admin role — and it is blocked from search engines with a noindex rule.",
+  },
+  {
+    question: "How do I upload my project for deployment?",
+    answer:
+      "Open your dashboard, go to Builds and upload your project archive (up to 100 MB). The file is stored in a private bucket, appears in your build history with its status, and the NAASIFY team is notified to deploy it. Admins download it through a secure, signed link.",
+  },
+  {
+    question: "Does NAASIFY send email confirmations and receipts?",
+    answer:
+      "Yes. Email is sent automatically for the key account events — a welcome message when you sign up, a payment receipt when an order is confirmed, a renewal reminder before a subscription expires, and a notification when support replies. These transactional emails do not require you to verify your address first.",
+  },
+  {
+    question: "Is my connection and payment data secure?",
+    answer:
+      "Yes. NAASIFY serves everything over HTTPS, never stores raw card details, and delegates payment processing to Paystack, a PCI-DSS compliant gateway. Webhook events are verified with an HMAC-SHA512 signature and de-duplicated by event id, and database access is locked down with row-level security.",
+  },
+  {
     question: "How do I contact NAASIFY support?",
-    answer: `Email ${CONTACT_EMAIL} any time. Support is handled by real engineers — usually within one business day — not a chatbot.`,
+    answer: `Email ${CONTACT_EMAIL} any time, or use the support chat inside your dashboard for a real-time thread with our engineers. Support is handled by real people — usually within one business day — not a chatbot.`,
   },
 ];
 
@@ -240,6 +285,43 @@ export function servicesJsonLd(services: Service[]) {
         url: absoluteUrl("/services"),
       },
     })),
+  };
+}
+
+/**
+ * BlogPosting JSON-LD for an individual article. Surfaces rich results
+ * (headline, image, author, publish/modified dates) and gives answer engines a
+ * canonical, machine-readable version of the post.
+ */
+export function articleJsonLd(post: {
+  title: string;
+  slug: string;
+  excerpt?: string | null;
+  coverImageUrl?: string | null;
+  authorName?: string | null;
+  publishedAt: string;
+  updatedAt?: string | null;
+  tags?: string[] | null;
+}) {
+  const url = absoluteUrl(`/blog/${post.slug}`);
+  return {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "@id": url,
+    mainEntityOfPage: { "@type": "WebPage", "@id": url },
+    headline: post.title,
+    description: post.excerpt ?? undefined,
+    image: post.coverImageUrl ? [post.coverImageUrl] : [OG_IMAGE.url],
+    datePublished: post.publishedAt,
+    dateModified: post.updatedAt ?? post.publishedAt,
+    author: {
+      "@type": "Person",
+      name: post.authorName ?? SITE_NAME,
+      url: SITE_URL,
+    },
+    publisher: { "@id": `${SITE_URL}/#organization` },
+    ...(post.tags?.length ? { keywords: post.tags.join(", ") } : {}),
+    inLanguage: "en",
   };
 }
 

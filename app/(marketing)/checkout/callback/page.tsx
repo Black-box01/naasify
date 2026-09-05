@@ -4,14 +4,17 @@ import { confirmAndActivate } from "@/lib/orders";
 import { ReCheckButton } from "@/components/checkout/ReCheckButton";
 import { AnimatedGradient } from "@/components/effects/AnimatedGradient";
 import { Icon } from "@/components/ui/icons";
-import { SITE_NAME } from "@/lib/constants";
+import { buildMetadata } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-  title: `Checkout — ${SITE_NAME}`,
-  robots: { index: false },
-};
+export const metadata: Metadata = buildMetadata({
+  title: "Checkout",
+  description:
+    "Confirming your NAASIFY payment and activating your subscription.",
+  path: "/checkout/callback",
+  noIndex: true,
+});
 
 type Status = "paid" | "pending" | "not_found";
 

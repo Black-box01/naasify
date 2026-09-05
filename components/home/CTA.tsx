@@ -33,6 +33,13 @@ export function CTA() {
               Contact sales
             </Link>
           </div>
+          <Link
+            href="/blog"
+            className="mt-7 inline-flex items-center gap-2 text-sm font-semibold text-white/80 underline-offset-4 transition-colors hover:text-white hover:underline"
+          >
+            <Icon name="book-open" className="h-4 w-4" />
+            Read the NAASIFY blog
+          </Link>
         </div>
       </div>
     </section>

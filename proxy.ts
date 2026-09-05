@@ -70,7 +70,7 @@ export async function proxy(request: NextRequest) {
 
   if (user && (path === "/admin" || path.startsWith("/admin/"))) {
     const { data: profile } = await supabase
-      .from("profiles")
+      .from("naasify_profiles")
       .select("role")
       .eq("id", user.id)
       .single();
