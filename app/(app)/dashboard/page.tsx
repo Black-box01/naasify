@@ -8,15 +8,22 @@ import { ExpiryBanner } from "@/components/dashboard/ExpiryBanner";
 import { UploadBuild } from "@/components/dashboard/UploadBuild";
 import { BuildsList } from "@/components/dashboard/BuildsList";
 import { SupportChat } from "@/components/dashboard/SupportChat";
+import { EntitlementsSummary } from "@/components/dashboard/EntitlementsSummary";
+import { AddOnServices, type AddOnCard } from "@/components/dashboard/AddOnServices";
+import { ServiceRequestsList } from "@/components/dashboard/ServiceRequestsList";
 import { Badge } from "@/components/ui/Badge";
 import { Icon } from "@/components/ui/icons";
 import { formatMoney } from "@/lib/money";
 import { CYCLE_LABELS } from "@/lib/constants";
 import { daysUntil } from "@/lib/utils";
+import { getEntitlements, remainingQuota } from "@/lib/entitlements";
+import { ADD_ON_SLUGS } from "@/lib/service-requests";
 import type {
   CurrencyCode,
   Order,
   OrderStatus,
+  Service,
+  ServiceRequestWithUser,
   Subscription,
   SubscriptionStatus,
   UserBuild,
@@ -50,29 +57,54 @@ export default async function DashboardPage() {
   const { user, profile } = await requireUser();
   const supabase = createServiceClient();
 
-  const [subsRes, ordersRes, buildsRes] = await Promise.all([
-    supabase
-      .from("naasify_subscriptions")
-      .select("*, plan:naasify_plans(*)")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false }),
-    supabase
-      .from("naasify_orders")
-      .select("*, plan:naasify_plans(*)")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false }),
-    supabase
-      .from("naasify_user_builds")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("uploaded_at", { ascending: false }),
-  ]);
+  const [subsRes, ordersRes, buildsRes, servicesRes, requestsRes, entitlements] =
+    await Promise.all([
+      supabase
+        .from("naasify_subscriptions")
+        .select("*, plan:naasify_plans(*)")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("naasify_orders")
+        .select("*, plan:naasify_plans(*)")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("naasify_user_builds")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("uploaded_at", { ascending: false }),
+      supabase
+        .from("naasify_services")
+        .select("*")
+        .eq("is_active", true)
+        .in("slug", [...ADD_ON_SLUGS])
+        .order("sort_order", { ascending: true }),
+      supabase
+        .from("naasify_service_requests")
+        .select("*, service:naasify_services(id, name, slug, icon_key)")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false }),
+      getEntitlements(user.id),
+    ]);
 
   const subscriptions = (subsRes.data ?? []) as Subscription[];
   const orders = (ordersRes.data ?? []) as Order[];
   const builds = (buildsRes.data ?? []) as UserBuild[];
+  const services = (servicesRes.data ?? []) as Service[];
+  const serviceRequests = (requestsRes.data ?? []) as ServiceRequestWithUser[];
   const activeSubs = subscriptions.filter((s) => s.status === "active");
   const displayName = profile?.full_name || user.email || "there";
+
+  // Per-add-on eligibility for the dashboard cards (server-authoritative).
+  const addOnCards: AddOnCard[] = services.map((service) => ({
+    id: service.id,
+    name: service.name,
+    slug: service.slug,
+    iconKey: service.icon_key,
+    quota: entitlements.addons[service.slug] ?? 0,
+    remaining: remainingQuota(entitlements, service.slug),
+  }));
 
   // Soonest-expiring active plan drives the colour-coded countdown banner.
   const soonestExpiring = [...activeSubs].sort(
@@ -166,6 +198,8 @@ export default async function DashboardPage() {
         )}
       </section>
 
+      <EntitlementsSummary entitlements={entitlements} />
+
       {/* Project builds */}
       <section className="mt-14">
         <h2 className="font-display text-lg font-bold text-foreground">Project builds</h2>
@@ -173,9 +207,28 @@ export default async function DashboardPage() {
           Upload a zip of your build — we&apos;ll review and deploy it for you.
         </p>
         <div className="mt-4">
-          <UploadBuild userId={user.id} />
+          <UploadBuild
+            storageMb={entitlements.storage_mb}
+            maxFileMb={entitlements.max_file_mb}
+            allowedFileTypes={entitlements.allowed_file_types}
+            maxBuilds={entitlements.max_builds}
+            usedBytes={entitlements.usage.storage_used_bytes}
+            buildsCount={entitlements.usage.builds_count}
+          />
         </div>
         <BuildsList builds={builds} />
+      </section>
+
+      {/* Add-on services */}
+      <AddOnServices cards={addOnCards} />
+
+      {/* Service requests */}
+      <section className="mt-14">
+        <h2 className="font-display text-lg font-bold text-foreground">Your requests</h2>
+        <p className="mt-1 text-sm text-foreground/50">
+          Track the add-on services you&apos;ve requested.
+        </p>
+        <ServiceRequestsList requests={serviceRequests} />
       </section>
 
       {/* Support chat */}

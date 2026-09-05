@@ -19,6 +19,19 @@ export const serviceSchema = z.object({
 export type ServiceInput = z.infer<typeof serviceSchema>;
 export const serviceUpdateSchema = serviceSchema.partial();
 
+/**
+ * Structured plan rights (naasify_plans.entitlements). Every field defaults so
+ * a partially-filled admin form still yields a complete, predictable object.
+ */
+export const entitlementsSchema = z.object({
+  storage_mb: z.number().int().min(0).max(10_000_000).default(0),
+  max_file_mb: z.number().int().min(0).max(100_000).default(0),
+  allowed_file_types: z.array(z.string().max(20)).max(60).default([]),
+  max_builds: z.number().int().min(0).max(1_000_000).default(0),
+  addons: z.record(z.string(), z.number().int().min(0).max(100_000)).default({}),
+});
+export type EntitlementsInput = z.infer<typeof entitlementsSchema>;
+
 export const planSchema = z.object({
   service_id: z.string().uuid().nullable(),
   name: z.string().min(1).max(80),
@@ -26,6 +39,7 @@ export const planSchema = z.object({
   price: z.number().min(0),
   currency: z.enum(["NGN", "USD"]),
   features: z.array(z.string().max(200)).max(30).default([]),
+  entitlements: entitlementsSchema.optional(),
   is_highlighted: z.boolean().default(false),
   is_active: z.boolean().default(true),
   sort_order: z.number().int().min(0).max(9999).default(0),
@@ -48,6 +62,24 @@ export const orderStatusSchema = z.object({
 
 export const buildStatusSchema = z.object({
   status: z.enum(["pending", "processing", "completed"]),
+});
+
+/**
+ * Metadata a client sends BEFORE uploading, so POST /api/builds can validate the
+ * plan's storage quota + allowed file types and issue a signed upload URL. The
+ * size ceiling mirrors the bucket's 1 GB hard limit; the per-plan cap is checked
+ * separately in lib/entitlements.ts.
+ */
+export const buildUploadSchema = z.object({
+  file_name: z.string().min(1, "File name is empty").max(300),
+  file_size: z.number().int().min(1).max(1_073_741_824),
+  mime_type: z.string().max(200).optional().nullable(),
+});
+
+/** Admin action on a service request (status transition + optional note). */
+export const requestStatusSchema = z.object({
+  status: z.enum(["pending", "approved", "fulfilled", "rejected"]),
+  admin_note: z.string().max(2000).optional(),
 });
 
 /** User -> admin support message (conversation_id is derived from the session). */

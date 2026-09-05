@@ -33,11 +33,30 @@ export interface Plan {
   price: string;
   currency: CurrencyCode;
   features: string[];
+  /** Structured rights granted by this plan (admin-editable). */
+  entitlements: PlanEntitlements;
   is_highlighted: boolean;
   is_active: boolean;
   sort_order: number;
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * Structured rights a plan grants, stored as jsonb on naasify_plans and merged
+ * across a user's active subscriptions by lib/entitlements.ts.
+ */
+export interface PlanEntitlements {
+  /** Aggregate upload storage quota in MB (0 = project uploads disabled). */
+  storage_mb: number;
+  /** Per-file size cap in MB. */
+  max_file_mb: number;
+  /** Allowed upload extensions (lowercase, no dot); ["*"] = any type. */
+  allowed_file_types: string[];
+  /** Maximum number of build records (0 = project uploads disabled). */
+  max_builds: number;
+  /** Eligible add-on services: service slug -> max concurrent requests. */
+  addons: Record<string, number>;
 }
 
 export type OrderStatus = "pending" | "paid" | "failed" | "refunded";
@@ -160,4 +179,27 @@ export interface BlogPost {
 /** A blog post joined with its author profile (public + admin views). */
 export interface BlogPostWithAuthor extends BlogPost {
   author?: Pick<Profile, "id" | "full_name" | "email"> | null;
+}
+
+export type RequestStatus = "pending" | "approved" | "fulfilled" | "rejected";
+
+/** A user's request for an eligible add-on service (domain, SMTP, VPS, VPN). */
+export interface ServiceRequest {
+  id: string;
+  user_id: string;
+  service_id: string;
+  /** Denormalised service slug snapshot (quota checks + display). */
+  service_slug: string;
+  /** Type-specific fields validated against REQUEST_CONFIGS[slug].schema. */
+  details: Record<string, unknown>;
+  status: RequestStatus;
+  admin_note: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** A service request joined with its requester + service (admin views). */
+export interface ServiceRequestWithUser extends ServiceRequest {
+  user?: Pick<Profile, "id" | "email" | "full_name"> | null;
+  service?: { id: string; name: string; slug: string; icon_key: string } | null;
 }

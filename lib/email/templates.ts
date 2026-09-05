@@ -346,3 +346,84 @@ export function supportReplyUserEmail({
     ${emailFooter()}
   `);
 }
+
+/** Admin notification for a new add-on service request. */
+export function serviceRequestAdminEmail({
+  userName,
+  userEmail,
+  serviceName,
+  summary,
+}: {
+  userName?: string | null;
+  userEmail: string;
+  serviceName: string;
+  summary: string;
+}): string {
+  return wrapEmail(`
+    ${emailHeader("New service request", GRADIENTS.brand)}
+    <div style="${BODY}">
+      <div style="margin-bottom: 1.4rem;">
+        <p style="${LABEL}">Requested by</p>
+        <p style="color: #111827; font-size: 1rem; font-weight: 700; margin: 0;">${escapeHtml(userName || "A user")}</p>
+        <p style="color: #6b7280; font-size: 0.875rem; margin: 0.25rem 0 0;">
+          <a href="mailto:${escapeHtml(userEmail)}" style="color: #0891b2; text-decoration: none;">${escapeHtml(userEmail)}</a>
+        </p>
+      </div>
+      <div style="margin-bottom: 1.4rem;">
+        <p style="${LABEL}">Service</p>
+        <p style="color: #111827; font-size: 1rem; font-weight: 700; margin: 0;">${escapeHtml(serviceName)}</p>
+      </div>
+      <div>
+        <p style="${LABEL}">Details</p>
+        <div style="background: #ffffff; border: 1px solid #ece9f5; border-radius: 0.75rem; padding: 1rem;">
+          <p style="color: #111827; font-size: 0.95rem; line-height: 1.65; margin: 0;">${escapeHtml(summary).replace(/\n/g, "<br/>")}</p>
+        </div>
+      </div>
+      <div style="text-align: center; margin: 1.5rem 0 0;">
+        <a href="${APP_URL}/admin/requests" style="display: inline-block; background: ${GRADIENTS.brand}; color: #ffffff; text-decoration: none; font-weight: 700; font-size: 0.9rem; padding: 0.7rem 1.5rem; border-radius: 999px;">Review requests</a>
+      </div>
+    </div>
+    ${emailFooter()}
+  `);
+}
+
+/** Optional notification to a user when an admin updates their request status. */
+export function serviceRequestStatusEmail({
+  name,
+  serviceName,
+  statusLabel,
+  adminNote,
+}: {
+  name?: string | null;
+  serviceName: string;
+  statusLabel: string;
+  adminNote?: string | null;
+}): string {
+  const greeting = name ? `Hi ${escapeHtml(name)},` : "Hello,";
+  return wrapEmail(`
+    ${emailHeader("Your service request was updated", GRADIENTS.receipt)}
+    <div style="${BODY}">
+      <p style="font-size: 1rem; color: #374151; margin: 0 0 1rem;">${greeting}</p>
+      <p style="font-size: 0.95rem; color: #374151; line-height: 1.7; margin: 0 0 1.25rem;">
+        Your <strong style="color: #4c1d95;">${escapeHtml(serviceName)}</strong> request is now
+        <strong style="color: #4c1d95;">${escapeHtml(statusLabel)}</strong>.
+      </p>
+      ${
+        adminNote
+          ? `<div style="background: #ffffff; border: 1px solid #ece9f5; border-radius: 0.75rem; padding: 1rem; margin-bottom: 1.25rem;">
+              <p style="${LABEL}">Note from NAASIFY</p>
+              <p style="color: #111827; font-size: 0.95rem; line-height: 1.65; margin: 0;">${escapeHtml(adminNote).replace(/\n/g, "<br/>")}</p>
+            </div>`
+          : ""
+      }
+      <div style="text-align: center; margin-bottom: 1.25rem;">
+        <a href="${APP_URL}/dashboard" style="display: inline-block; background: ${GRADIENTS.brand}; color: #ffffff; text-decoration: none; font-weight: 700; font-size: 0.95rem; padding: 0.8rem 1.75rem; border-radius: 999px;">View your dashboard</a>
+      </div>
+      <p style="font-size: 0.9rem; color: #374151; margin: 0;">
+        Questions? Reply to this email or write to
+        <a href="mailto:${CONTACT_EMAIL}" style="color: #7c3aed; text-decoration: none;">${CONTACT_EMAIL}</a>.
+      </p>
+    </div>
+    ${emailFooter()}
+  `);
+}

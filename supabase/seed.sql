@@ -86,3 +86,27 @@ where not exists (
     and p.name = b.name
     and p.billing_cycle = b.cycle
 );
+
+-- ----------------------------------------------------------------------------
+-- Plan entitlements (idempotent). These grant the structured rights enforced by
+-- lib/entitlements.ts: storage_mb (aggregate upload quota), max_file_mb
+-- (per-file cap), allowed_file_types (extensions; ["*"] = any), max_builds, and
+-- addons (add-on service slug -> max concurrent requests). Admins can override
+-- any of these per plan in Admin > Plans.
+-- ----------------------------------------------------------------------------
+-- Bundle tiers (service_id IS NULL) -- the /pricing cards.
+update public.naasify_plans set entitlements = '{"storage_mb":5120,"max_file_mb":100,"allowed_file_types":["zip","tar","gz","tgz"],"max_builds":10,"addons":{}}'::jsonb
+  where service_id is null and name = 'Launch';
+update public.naasify_plans set entitlements = '{"storage_mb":51200,"max_file_mb":500,"allowed_file_types":["*"],"max_builds":100,"addons":{"domain-names":1,"smtp-emailing":5,"vps":1,"vpn":10}}'::jsonb
+  where service_id is null and name = 'All-in-One';
+update public.naasify_plans set entitlements = '{"storage_mb":204800,"max_file_mb":1000,"allowed_file_types":["*"],"max_builds":500,"addons":{"domain-names":5,"smtp-emailing":25,"vps":5,"vpn":50}}'::jsonb
+  where service_id is null and name = 'Enterprise';
+
+-- Per-service tiers (service_id IS NOT NULL): upload rights only; add-ons are
+-- bundle-driven cross-sells.
+update public.naasify_plans set entitlements = '{"storage_mb":1024,"max_file_mb":100,"allowed_file_types":["zip","tar","gz","tgz"],"max_builds":5,"addons":{}}'::jsonb
+  where service_id is not null and name = 'Starter';
+update public.naasify_plans set entitlements = '{"storage_mb":5120,"max_file_mb":200,"allowed_file_types":["*"],"max_builds":25,"addons":{}}'::jsonb
+  where service_id is not null and name = 'Pro';
+update public.naasify_plans set entitlements = '{"storage_mb":20480,"max_file_mb":500,"allowed_file_types":["*"],"max_builds":100,"addons":{}}'::jsonb
+  where service_id is not null and name = 'Enterprise';

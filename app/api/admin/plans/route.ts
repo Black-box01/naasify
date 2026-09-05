@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { planSchema } from "@/lib/validation";
+import { DEFAULT_ENTITLEMENTS } from "@/lib/entitlements";
 
 export const dynamic = "force-dynamic";
 
@@ -67,6 +68,7 @@ export async function POST(request: Request) {
       price: input.price,
       currency: input.currency,
       features: input.features,
+      entitlements: input.entitlements ?? DEFAULT_ENTITLEMENTS,
       is_highlighted: input.is_highlighted,
       is_active: input.is_active,
       sort_order: input.sort_order,

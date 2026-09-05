@@ -64,6 +64,10 @@ create table if not exists public.naasify_plans (
   price numeric(12, 2) not null check (price >= 0),
   currency text not null default 'NGN' check (currency in ('NGN', 'USD')),
   features jsonb not null default '[]'::jsonb,
+  -- Structured, admin-editable rights granted by this plan: storage quota (MB),
+  -- per-file cap (MB), allowed upload file types, build limit, and eligible
+  -- add-on services with per-service request quotas. See lib/entitlements.ts.
+  entitlements jsonb not null default '{}'::jsonb,
   is_highlighted boolean not null default false,
   is_active boolean not null default true,
   sort_order integer not null default 0,
@@ -74,6 +78,10 @@ create table if not exists public.naasify_plans (
 -- One plan name per service (NULL service = bundle) per billing cycle.
 create unique index if not exists plans_unique_cycle_name
   on public.naasify_plans ((coalesce(service_id, '00000000-0000-0000-0000-000000000000'::uuid)), billing_cycle, name);
+
+-- Migration for databases created before plan entitlements existed.
+alter table public.naasify_plans
+  add column if not exists entitlements jsonb not null default '{}'::jsonb;
 
 -- ----------------------------------------------------------------------------
 -- Orders (created at checkout, paid by Paystack webhook / callback)
@@ -196,6 +204,24 @@ create table if not exists public.naasify_blog_posts (
 );
 
 -- ----------------------------------------------------------------------------
+-- Service requests (a user asks for an eligible add-on; admins review/action)
+-- service_slug is a denormalised snapshot so quota checks and the dashboard
+-- avoid a join. details holds the type-specific fields defined in
+-- lib/service-requests.ts (domain, SMTP, VPS, VPN, ...).
+-- ----------------------------------------------------------------------------
+create table if not exists public.naasify_service_requests (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  service_id uuid not null references public.naasify_services (id) on delete cascade,
+  service_slug text not null,
+  details jsonb not null default '{}'::jsonb,
+  status text not null default 'pending' check (status in ('pending', 'approved', 'fulfilled', 'rejected')),
+  admin_note text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- ----------------------------------------------------------------------------
 -- Indexes
 -- ----------------------------------------------------------------------------
 create index if not exists services_active_sort_idx on public.naasify_services (is_active, sort_order);
@@ -214,6 +240,9 @@ create index if not exists support_messages_unread_idx on public.naasify_support
 -- slug lookups are served by the unique constraint on naasify_blog_posts.slug.
 create index if not exists blog_posts_status_published_idx on public.naasify_blog_posts (status, published_at desc);
 create index if not exists blog_posts_published_at_idx on public.naasify_blog_posts (published_at desc) where status = 'published';
+create index if not exists service_requests_user_created_idx on public.naasify_service_requests (user_id, created_at desc);
+create index if not exists service_requests_status_created_idx on public.naasify_service_requests (status, created_at desc);
+create index if not exists service_requests_active_quota_idx on public.naasify_service_requests (user_id, service_id) where status in ('pending', 'approved');
 
 -- ----------------------------------------------------------------------------
 -- updated_at maintenance
@@ -249,6 +278,9 @@ create trigger user_builds_set_updated_at before update on public.naasify_user_b
 drop trigger if exists blog_posts_set_updated_at on public.naasify_blog_posts;
 create trigger blog_posts_set_updated_at before update on public.naasify_blog_posts
   for each row execute function public.set_updated_at();
+drop trigger if exists service_requests_set_updated_at on public.naasify_service_requests;
+create trigger service_requests_set_updated_at before update on public.naasify_service_requests
+  for each row execute function public.set_updated_at();
 
 -- ----------------------------------------------------------------------------
 -- Role helper (SECURITY DEFINER avoids RLS recursion inside policies)
@@ -276,6 +308,7 @@ alter table public.naasify_contact_messages enable row level security;
 alter table public.naasify_user_builds enable row level security;
 alter table public.naasify_support_messages enable row level security;
 alter table public.naasify_blog_posts enable row level security;
+alter table public.naasify_service_requests enable row level security;
 
 -- profiles -------------------------------------------------------------------
 drop policy if exists profiles_select_own_or_admin on public.naasify_profiles;
@@ -396,10 +429,10 @@ create policy user_builds_select_own_or_admin on public.naasify_user_builds
   for select to authenticated
   using (user_id = auth.uid() or public.naasify_is_admin());
 
+-- Build rows are inserted server-side (service role) by POST /api/builds after
+-- the plan's storage quota + allowed file types are validated, so the browser
+-- can no longer insert them directly. Drop the legacy self-insert policy.
 drop policy if exists user_builds_insert_own on public.naasify_user_builds;
-create policy user_builds_insert_own on public.naasify_user_builds
-  for insert to authenticated
-  with check (user_id = auth.uid());
 
 -- Only admins move a build through pending -> processing -> completed.
 drop policy if exists user_builds_update_admin on public.naasify_user_builds;
@@ -469,13 +502,42 @@ create policy blog_posts_delete_admin on public.naasify_blog_posts
   for delete to authenticated
   using (public.naasify_is_admin());
 
+-- service_requests -----------------------------------------------------------
+-- A user sees and manages only their own requests; admins see and action all.
+drop policy if exists service_requests_select_own_or_admin on public.naasify_service_requests;
+create policy service_requests_select_own_or_admin on public.naasify_service_requests
+  for select to authenticated
+  using (user_id = auth.uid() or public.naasify_is_admin());
+
+-- Eligibility/quota is enforced server-side in POST /api/service-requests; the
+-- policy only guarantees a user creates requests for themselves.
+drop policy if exists service_requests_insert_own on public.naasify_service_requests;
+create policy service_requests_insert_own on public.naasify_service_requests
+  for insert to authenticated
+  with check (user_id = auth.uid());
+
+-- Only admins move a request through pending -> approved -> fulfilled/rejected.
+drop policy if exists service_requests_update_admin on public.naasify_service_requests;
+create policy service_requests_update_admin on public.naasify_service_requests
+  for update to authenticated
+  using (public.naasify_is_admin())
+  with check (public.naasify_is_admin());
+
+-- A user may withdraw their own request; admins may delete any.
+drop policy if exists service_requests_delete_own_or_admin on public.naasify_service_requests;
+create policy service_requests_delete_own_or_admin on public.naasify_service_requests
+  for delete to authenticated
+  using (user_id = auth.uid() or public.naasify_is_admin());
+
 -- ----------------------------------------------------------------------------
 -- Storage: private "user-builds" bucket, objects namespaced as {user_id}/...
 -- ----------------------------------------------------------------------------
--- 100 MB per object; the bucket stays private (admin downloads via signed URL).
+-- 1 GB hard ceiling per object; the effective per-user cap is the plan's
+-- max_file_mb entitlement, validated in POST /api/builds before a signed URL is
+-- issued. The bucket stays private (admin downloads via signed URL).
 insert into storage.buckets (id, name, public, file_size_limit)
-values ('user-builds', 'user-builds', false, 104857600)
-on conflict (id) do update set public = false, file_size_limit = 104857600;
+values ('user-builds', 'user-builds', false, 1073741824)
+on conflict (id) do update set public = false, file_size_limit = 1073741824;
 
 drop policy if exists user_builds_storage_select on storage.objects;
 create policy user_builds_storage_select on storage.objects
@@ -485,13 +547,10 @@ create policy user_builds_storage_select on storage.objects
     and ((storage.foldername(name))[1] = auth.uid()::text or public.naasify_is_admin())
   );
 
+-- Uploads now use a server-issued signed URL (POST /api/builds), which bypasses
+-- RLS for that single object, so the browser no longer needs a direct storage
+-- insert policy. Drop the legacy one to close the bypass.
 drop policy if exists user_builds_storage_insert on storage.objects;
-create policy user_builds_storage_insert on storage.objects
-  for insert to authenticated
-  with check (
-    bucket_id = 'user-builds'
-    and (storage.foldername(name))[1] = auth.uid()::text
-  );
 
 drop policy if exists user_builds_storage_update on storage.objects;
 create policy user_builds_storage_update on storage.objects
