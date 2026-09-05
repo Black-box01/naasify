@@ -5,6 +5,7 @@ import { createServiceClient } from "@/lib/supabase/admin";
 import { SignOutButton } from "@/components/SignOutButton";
 import { BuyButton } from "@/components/pricing/BuyButton";
 import { ExpiryBanner } from "@/components/dashboard/ExpiryBanner";
+import { CheckoutErrorBanner } from "@/components/checkout/CheckoutErrorBanner";
 import { UploadBuild } from "@/components/dashboard/UploadBuild";
 import { BuildsList } from "@/components/dashboard/BuildsList";
 import { SupportChat } from "@/components/dashboard/SupportChat";
@@ -53,7 +54,12 @@ function formatDate(value: string | null): string {
   return new Date(value).toLocaleDateString("en-US", { dateStyle: "medium" });
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const { error } = await searchParams;
   const { user, profile } = await requireUser();
   const supabase = createServiceClient();
 
@@ -132,6 +138,8 @@ export default async function DashboardPage() {
         </div>
       </header>
 
+      <CheckoutErrorBanner code={error} />
+
       {soonestExpiring && (
         <ExpiryBanner
           planName={soonestExpiring.plan?.name ?? "Subscription"}
@@ -185,7 +193,8 @@ export default async function DashboardPage() {
                     <BuyButton
                       planId={sub.plan_id}
                       planName={sub.plan?.name ?? "plan"}
-                      email={user.email ?? null}
+                      authenticated
+                      returnTo="/dashboard"
                       label="Renew"
                       size="sm"
                       variant="glass"

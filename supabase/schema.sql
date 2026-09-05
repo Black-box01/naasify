@@ -95,12 +95,27 @@ create table if not exists public.naasify_orders (
   amount numeric(12, 2) not null,
   currency text not null default 'NGN',
   paystack_reference text not null unique,
+  -- Gateway-agnostic merchant reference lives in paystack_reference (kept for
+  -- continuity across processors). `gateway` records which processor owns the
+  -- charge; provider_transaction_id stores Flutterwave's numeric transaction id
+  -- (Flutterwave verifies by id, Paystack verifies by reference).
+  gateway text not null default 'paystack' check (gateway in ('paystack', 'flutterwave')),
+  provider_transaction_id text,
   status text not null default 'pending' check (status in ('pending', 'paid', 'failed', 'refunded')),
   paid_at timestamptz,
   raw_event jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- Migration for databases created before multi-gateway support existed. The
+-- gateway CHECK is only declared in the CREATE above (fresh databases); the app
+-- only ever writes 'paystack' or 'flutterwave', so migrated databases stay valid
+-- without re-adding the constraint here.
+alter table public.naasify_orders
+  add column if not exists gateway text not null default 'paystack';
+alter table public.naasify_orders
+  add column if not exists provider_transaction_id text;
 
 -- ----------------------------------------------------------------------------
 -- Subscriptions (activated from a paid order; unique(order_id) = no double activation)
@@ -128,6 +143,19 @@ alter table public.naasify_subscriptions
 -- Paystack webhook events (event_id PK = hard idempotency against retries)
 -- ----------------------------------------------------------------------------
 create table if not exists public.naasify_paystack_events (
+  event_id text primary key,
+  event_type text not null,
+  payload jsonb not null default '{}'::jsonb,
+  status text not null default 'received' check (status in ('received', 'processed', 'failed', 'ignored')),
+  error text,
+  processed_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+-- ----------------------------------------------------------------------------
+-- Flutterwave webhook events (event_id PK = hard idempotency against retries)
+-- ----------------------------------------------------------------------------
+create table if not exists public.naasify_flutterwave_events (
   event_id text primary key,
   event_type text not null,
   payload jsonb not null default '{}'::jsonb,
@@ -304,6 +332,7 @@ alter table public.naasify_plans enable row level security;
 alter table public.naasify_orders enable row level security;
 alter table public.naasify_subscriptions enable row level security;
 alter table public.naasify_paystack_events enable row level security;
+alter table public.naasify_flutterwave_events enable row level security;
 alter table public.naasify_contact_messages enable row level security;
 alter table public.naasify_user_builds enable row level security;
 alter table public.naasify_support_messages enable row level security;
@@ -400,6 +429,7 @@ create policy subscriptions_update_admin on public.naasify_subscriptions
   with check (public.naasify_is_admin());
 
 -- paystack_events: service role only (no policies for anon/authenticated) -----
+-- flutterwave_events: service role only (no policies for anon/authenticated) ---
 
 -- contact_messages -----------------------------------------------------------
 drop policy if exists contact_messages_insert_public on public.naasify_contact_messages;
@@ -600,6 +630,11 @@ $$;
 -- 4. Paystack dashboard -> Settings -> Webhooks: set the URL to
 --    https://<your-domain>/api/webhooks/paystack and copy the secret into
 --    PAYSTACK_SECRET_KEY (the signature is HMAC-SHA512 of the raw body).
+-- 4b. Flutterwave dashboard -> Settings -> Webhooks: set the URL to
+--    https://<your-domain>/api/webhooks/flutterwave and set its secret hash to
+--    FLW_SECRET_HASH (verified by plain equality of the "verif-hash" header).
+--    Set FLW_SECRET_KEY to enable it; when BOTH gateways are configured
+--    Flutterwave is used by default (override with PAYMENT_GATEWAY).
 -- 5. The "user-builds" storage bucket and the support_messages realtime
 --    publication are created automatically above (nothing manual needed).
 -- 6. Expiry cron: deploy the daily job (vercel.json -> /api/cron/expiring) and

@@ -2,141 +2,72 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { Modal } from "@/components/ui/Modal";
 import { cn } from "@/lib/utils";
 
 type Size = "sm" | "md" | "lg";
 type Variant = "primary" | "glass" | "outline";
 
 /**
- * Starts a Paystack checkout for a plan. When the visitor is signed in we use
- * their account email; guests are prompted for an email in a modal first.
- * The API recomputes the amount from the DB plan — the client never sends one.
+ * Launches a login-gated purchase. Clicking navigates straight to the
+ * /checkout/start server route, which charges signed-in buyers immediately
+ * (hosted gateway) or bounces signed-out visitors to /login with a ?next that
+ * resumes the SAME purchase afterwards — never back to /pricing. The amount is
+ * always recomputed server-side, so the client sends only the plan id.
  */
 export function BuyButton({
   planId,
   planName,
-  email,
   label = "Get Started",
   variant = "primary",
   size = "md",
   className,
+  authenticated,
+  returnTo = "/pricing",
 }: {
   planId: string;
   planName: string;
-  email: string | null;
   label?: string;
   variant?: Variant;
   size?: Size;
   className?: string;
+  authenticated: boolean;
+  returnTo?: string;
 }) {
-  const [open, setOpen] = useState(false);
-  const [guestEmail, setGuestEmail] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function startCheckout(targetEmail: string) {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planId, email: targetEmail }),
-      });
-      const data = (await res.json()) as {
-        authorization_url?: string;
-        error?: string;
-      };
-      if (!res.ok || !data.authorization_url) {
-        throw new Error(data.error || "Could not start checkout.");
-      }
-      window.location.href = data.authorization_url;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
-      setLoading(false);
-    }
-  }
+  const missingPlan = !planId;
 
   function onClick() {
-    if (email) {
-      void startCheckout(email);
-    } else {
-      setError(null);
-      setOpen(true);
-    }
+    if (missingPlan || loading) return;
+    setLoading(true);
+    const start = `/checkout/start?planId=${encodeURIComponent(planId)}&return=${encodeURIComponent(returnTo)}`;
+    // Signed in → charge now. Signed out → log in, then resume this purchase.
+    window.location.assign(
+      authenticated ? start : `/login?next=${encodeURIComponent(start)}`,
+    );
   }
 
   return (
-    <>
+    <div className="w-full">
       <Button
         type="button"
         variant={variant}
         size={size}
-        loading={loading && !open}
+        loading={loading}
         onClick={onClick}
         className={cn("w-full", className)}
+        aria-label={`Purchase the ${planName} plan`}
       >
         {label}
       </Button>
-
-      {error && !open && (
+      {missingPlan ? (
         <p className="mt-2 text-center text-xs text-red-300" role="alert">
-          {error}
+          This plan is not available for purchase.
+        </p>
+      ) : (
+        <p className="mt-2 text-center text-xs text-foreground/40">
+          Secure checkout
         </p>
       )}
-
-      <Modal
-        open={open}
-        onClose={() => {
-          if (!loading) setOpen(false);
-        }}
-        title={`Checkout — ${planName}`}
-      >
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            const value = guestEmail.trim();
-            if (!value) return;
-            setOpen(false);
-            void startCheckout(value);
-          }}
-          className="space-y-4"
-        >
-          <p className="text-sm text-foreground/60">
-            Enter your email to receive your receipt and activate your plan. You
-            can create an account later.
-          </p>
-          <Input
-            label="Email address"
-            type="email"
-            required
-            autoComplete="email"
-            placeholder="you@company.com"
-            value={guestEmail}
-            onChange={(e) => setGuestEmail(e.target.value)}
-          />
-          {error && (
-            <p className="text-xs text-red-300" role="alert">
-              {error}
-            </p>
-          )}
-          <div className="flex justify-end gap-3 pt-1">
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => setOpen(false)}
-              disabled={loading}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" loading={loading} disabled={!guestEmail.trim()}>
-              Continue to payment
-            </Button>
-          </div>
-        </form>
-      </Modal>
-    </>
+    </div>
   );
 }

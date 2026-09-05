@@ -24,13 +24,13 @@ function PlanCard({
   cycle,
   currency,
   rate,
-  email,
+  authenticated,
 }: {
   plan: Plan;
   cycle: BillingCycle;
   currency: CurrencyCode;
   rate: number;
-  email: string | null;
+  authenticated: boolean;
 }) {
   const amount = convert(Number(plan.price), plan.currency, currency, rate);
   const showAlt = currency !== plan.currency;
@@ -86,7 +86,8 @@ function PlanCard({
         <BuyButton
           planId={plan.id}
           planName={plan.name}
-          email={email}
+          authenticated={authenticated}
+          returnTo="/pricing"
           variant={plan.is_highlighted ? "primary" : "glass"}
         />
       </div>
@@ -104,13 +105,13 @@ export function PricingCards({
   bundles,
   servicePlans,
   rate,
-  email,
+  authenticated,
 }: {
   cycle: BillingCycle;
   bundles: Plan[];
   servicePlans: ServicePlans[];
   rate: number;
-  email: string | null;
+  authenticated: boolean;
 }) {
   const [currency, setCurrency] = useState<CurrencyCode>("USD");
   const hasContent = bundles.length > 0 || servicePlans.length > 0;
@@ -147,7 +148,7 @@ export function PricingCards({
                 cycle={cycle}
                 currency={currency}
                 rate={rate}
-                email={email}
+                authenticated={authenticated}
               />
             ))}
           </div>
@@ -180,7 +181,7 @@ export function PricingCards({
                 cycle={cycle}
                 currency={currency}
                 rate={rate}
-                email={email}
+                authenticated={authenticated}
               />
             ))}
           </div>

@@ -66,6 +66,9 @@ export interface PlanWithService extends Plan {
   service?: { id: string; name: string; slug: string } | null;
 }
 
+/** Payment processor that owns an order's charge. */
+export type GatewayName = "flutterwave" | "paystack";
+
 /** An order joined with its plan (admin/dashboard). */
 export interface OrderWithPlan extends Omit<Order, "plan"> {
   plan?: Pick<Plan, "id" | "name"> | null;
@@ -80,6 +83,8 @@ export interface Order {
   amount: string;
   currency: string;
   paystack_reference: string;
+  gateway: GatewayName;
+  provider_transaction_id: string | null;
   status: OrderStatus;
   paid_at: string | null;
   raw_event: Record<string, unknown>;

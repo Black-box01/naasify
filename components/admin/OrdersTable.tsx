@@ -8,13 +8,19 @@ import { adminFetch } from "@/lib/adminApi";
 import { formatMoney } from "@/lib/money";
 import { formatDate } from "@/lib/utils";
 import { CYCLE_LABELS } from "@/lib/constants";
-import type { CurrencyCode, OrderStatus, OrderWithPlan } from "@/lib/types";
+import type { CurrencyCode, GatewayName, OrderStatus, OrderWithPlan } from "@/lib/types";
 
 const TONE: Record<OrderStatus, "success" | "warning" | "danger" | "neutral"> = {
   paid: "success",
   pending: "warning",
   failed: "danger",
   refunded: "neutral",
+};
+
+/** Colour-code the processor so admins can reconcile Flutterwave vs Paystack. */
+const GATEWAY_TONE: Record<GatewayName, "brand" | "accent"> = {
+  flutterwave: "accent",
+  paystack: "brand",
 };
 
 /** Orders admin: status filter + keyset “load more” pagination. */
@@ -146,8 +152,16 @@ export function OrdersTable() {
                     <td className="whitespace-nowrap px-5 py-3.5 font-medium text-foreground">
                       {formatMoney(Number(order.amount), order.currency as CurrencyCode)}
                     </td>
-                    <td className="px-5 py-3.5 font-mono text-xs text-foreground/40">
-                      {order.paystack_reference}
+                    <td className="px-5 py-3.5">
+                      <span className="block font-mono text-xs text-foreground/40">
+                        {order.paystack_reference}
+                      </span>
+                      <Badge
+                        tone={GATEWAY_TONE[order.gateway]}
+                        className="mt-1.5 px-2 py-0.5 text-[10px] font-medium capitalize"
+                      >
+                        {order.gateway}
+                      </Badge>
                     </td>
                     <td className="px-5 py-3.5">
                       <Badge tone={TONE[order.status]}>{order.status}</Badge>

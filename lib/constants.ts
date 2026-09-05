@@ -30,3 +30,13 @@ export const BUILD_STATUS_LABELS: Record<BuildStatus, string> = {
   processing: "Processing",
   completed: "Deployed",
 };
+
+/**
+ * Recoverable checkout errors surfaced via `?error=` on /pricing and /dashboard
+ * after a /checkout/start bounce. Unknown codes render nothing.
+ */
+export const CHECKOUT_ERROR_MESSAGES: Record<string, string> = {
+  plan_unavailable: "That plan is no longer available.",
+  checkout_failed: "We couldn't start checkout. Please try again.",
+  invalid_plan: "That plan link is invalid.",
+};

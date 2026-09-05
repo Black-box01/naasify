@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { PricingCards, type ServicePlans } from "@/components/pricing/PricingCards";
+import { CheckoutErrorBanner } from "@/components/checkout/CheckoutErrorBanner";
 import { AnimatedGradient } from "@/components/effects/AnimatedGradient";
 import { JsonLd } from "@/components/seo/JsonLd";
 import {
@@ -31,7 +32,7 @@ export const metadata: Metadata = buildMetadata({
 export default async function PricingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ cycle?: string }>;
+  searchParams: Promise<{ cycle?: string; error?: string }>;
 }) {
   const params = await searchParams;
   const requested = params.cycle as BillingCycle | undefined;
@@ -54,7 +55,7 @@ export default async function PricingPage({
     }))
     .filter((group) => group.plans.length > 0);
 
-  const email = current?.user.email ?? null;
+  const authenticated = !!current;
 
   return (
     <div className="relative">
@@ -72,12 +73,15 @@ export default async function PricingPage({
       </section>
 
       <div className="pb-24 pt-8">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+          <CheckoutErrorBanner code={params.error} />
+        </div>
         <PricingCards
           cycle={cycle}
           bundles={bundles}
           servicePlans={servicePlans}
           rate={rate}
-          email={email}
+          authenticated={authenticated}
         />
       </div>
 

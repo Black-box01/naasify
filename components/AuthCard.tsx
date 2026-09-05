@@ -5,13 +5,14 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { resolvePostAuthPath } from "@/lib/redirect";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 
 export function AuthCard({ mode }: { mode: "login" | "signup" }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const next = searchParams.get("next") || "/dashboard";
+  const nextParam = searchParams.get("next");
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -30,12 +31,23 @@ export function AuthCard({ mode }: { mode: "login" | "signup" }) {
     try {
       const supabase = createSupabaseBrowserClient();
       if (isLogin) {
-        const { error: signInError } = await supabase.auth.signInWithPassword({
+        const { data, error: signInError } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
         if (signInError) throw signInError;
-        router.push(next);
+        // Role-aware landing: admins → /admin, everyone else → /dashboard,
+        // unless a safe ?next deep-link (e.g. a purchase) overrides it.
+        let role: string | null = null;
+        if (data.user) {
+          const { data: prof } = await supabase
+            .from("naasify_profiles")
+            .select("role")
+            .eq("id", data.user.id)
+            .maybeSingle();
+          role = prof?.role ?? null;
+        }
+        router.push(resolvePostAuthPath(role, nextParam));
         router.refresh();
       } else {
         const { data, error: signUpError } = await supabase.auth.signUp({
@@ -45,7 +57,9 @@ export function AuthCard({ mode }: { mode: "login" | "signup" }) {
         });
         if (signUpError) throw signUpError;
         if (data.session) {
-          router.push(next);
+          // New users are always role='user' (handle_new_auth_user trigger),
+          // so skip the role fetch and just honour a safe ?next.
+          router.push(resolvePostAuthPath(null, nextParam));
           router.refresh();
         } else {
           setNotice(

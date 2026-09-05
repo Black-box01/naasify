@@ -6,9 +6,10 @@ cloud computing, VPS, VPN) with **quarterly / half-yearly / annual** plans. The
 public pricing page renders exactly what the admin published — including a
 highlighted middle **All-in-One** bundle (every service, seeded at **₦350,000 /
 year**) — displayed in **USD by default** with a live NGN↔USD converter.
-Checkout is via **Paystack** (signed, idempotent webhook + callback
-verification), accounts are optional, and there is a role-gated admin panel plus
-a contact page that emails **info@naasify.online** via Resend.
+Checkout is via **Flutterwave or Paystack** (auto-detected from env; signed,
+idempotent webhook + callback verification) and requires signing in first. There
+is a role-gated admin panel plus a contact page that emails
+**info@naasify.online** via Resend.
 
 **Design:** dark purple (`#7c3aed`) + cyan (`#06b6d4`), floating pill glass
 navbar, pill buttons, layered-shadow glass cards, animated gradient hero/CTA
@@ -23,7 +24,7 @@ sections, and a dot-grid cursor-reveal effect.
 | Framework  | Next.js **16.2.10** (App Router, `proxy.ts`)                  |
 | UI         | React **19.2.4**, TypeScript 5, Tailwind CSS **v4** (CSS-first) |
 | Database/Auth | Supabase (`@supabase/supabase-js`, `@supabase/ssr`) + RLS   |
-| Payments   | Paystack (raw `fetch` + `node:crypto`, no SDK)                |
+| Payments   | Flutterwave + Paystack (raw `fetch` + `node:crypto`, auto-detected)                |
 | Email      | Resend                                                        |
 | Validation | Zod v4                                                        |
 | Package manager | npm                                                      |
@@ -67,6 +68,10 @@ npm run dev                  # http://localhost:3000
 Copy `.env.example` → `.env.local`. All values are required for the matching
 feature to work; the app degrades gracefully where noted.
 
+> **Gateway auto-detection:** when both `FLW_SECRET_KEY` and `PAYSTACK_SECRET_KEY`
+> are set, **Flutterwave wins**. Set only one to use it, or set `PAYMENT_GATEWAY`
+> to force a gateway. Until `FLW_SECRET_KEY` exists, checkout keeps using Paystack.
+
 | Variable                          | Where used              | Notes                                                        |
 | --------------------------------- | ----------------------- | ------------------------------------------------------------ |
 | `NEXT_PUBLIC_SUPABASE_URL`        | client + server         | Supabase project URL                                          |
@@ -74,6 +79,10 @@ feature to work; the app degrades gracefully where noted.
 | `SUPABASE_SERVICE_ROLE_KEY`       | **server only**         | Bypasses RLS — orders, subscriptions, webhook, email flags    |
 | `PAYSTACK_SECRET_KEY`             | **server only**         | Live/test secret key; also the webhook HMAC secret            |
 | `PAYSTACK_PUBLIC_KEY`             | reference               | Public key (kept for completeness)                            |
+| `FLW_SECRET_KEY`                  | **server only**         | Flutterwave secret key; when set, Flutterwave becomes the active gateway |
+| `FLW_PUBLIC_KEY`                  | reference               | Flutterwave public key (kept for completeness)                |
+| `FLW_SECRET_HASH`                 | **server only**         | Must equal the Flutterwave dashboard webhook secret hash (`verif-hash`) |
+| `PAYMENT_GATEWAY`                 | **server only**         | Optional override: `flutterwave` or `paystack` (else auto-detected) |
 | `RESEND_API_KEY`                  | **server only**         | Missing key → emails skipped, contact still saves (`emailed:false`) |
 | `RESEND_FROM_EMAIL`               | **server only**         | Default `NAASIFY <info@naasify.online>`                          |
 | `CONTACT_TO_EMAIL`                | **server only**         | Inbox for contact messages (default `info@naasify.online`)       |
@@ -106,7 +115,7 @@ feature to work; the app degrades gracefully where noted.
    “check your email” notice until they verify.
 
 Every paid order is recorded in `naasify_orders` (amount, currency,
-`billing_cycle` = the purchased **duration**, Paystack reference, status,
+`billing_cycle` = the purchased **duration**, merchant reference + `gateway`, status,
 `paid_at`) and, on activation, in `naasify_subscriptions` (`starts_at` →
 `ends_at`). Both are surfaced on the user **Dashboard**: each subscription shows
 its full start → end date span, and the order-history table has a dedicated
@@ -145,6 +154,30 @@ The contact flow **inserts the message into the database first**, then attempts
 email. If Resend is down or unconfigured, the form still succeeds
 (`{ "success": true, "emailed": false }`), the row is visible in
 `/admin/messages`, and `email_sent` stays `false`.
+
+---
+
+## Flutterwave
+
+Flutterwave is the **default gateway whenever `FLW_SECRET_KEY` is set** (it wins
+over Paystack when both are configured).
+
+1. In the Flutterwave dashboard → **Settings → Webhooks**, add the callback URL:
+
+   ```
+   https://<your-domain>/api/webhooks/flutterwave
+   ```
+
+2. Set that webhook's **secret hash** to the exact value of `FLW_SECRET_HASH`.
+   Flutterwave echoes it back in the `verif-hash` header (plain equality, **not**
+   an HMAC), compared with a length-guarded `timingSafeEqual`.
+
+The [`/api/webhooks/flutterwave`](./app/api/webhooks/flutterwave/route.ts) route
+mirrors the Paystack webhook: an idempotency gate on
+`naasify_flutterwave_events.event_id`, activation only on a successful
+`charge.completed`, and it **always returns 200 for a validly hashed event**.
+`confirmAndActivate()` re-verifies by Flutterwave's numeric `transaction_id`, so
+the webhook body is never trusted for the amount/status.
 
 ---
 
@@ -209,17 +242,17 @@ naasify/
 │  ├─ layout.tsx            # fonts, metadata, OG/twitter, skip-link
 │  ├─ globals.css           # Tailwind v4 @theme tokens + glass/pill/gradient utilities
 │  ├─ icon.png              # file-based favicon
-│  ├─ (marketing)/          # public site: home, pricing, contact, checkout/callback
+│  ├─ (marketing)/          # public site: home, pricing, contact, checkout/{start,callback}
 │  ├─ (auth)/               # login, signup
 │  ├─ (app)/dashboard/      # signed-in subscription + order history
 │  ├─ (admin)/admin/        # role-gated panel: overview, services, plans, orders, messages
-│  └─ api/                  # contact, checkout, checkout/verify, webhooks/paystack, admin/*
+│  └─ api/                  # contact, checkout/verify, webhooks/{flutterwave,paystack}, admin/*
 ├─ components/
 │  ├─ layout/  effects/  ui/  home/  pricing/  admin/  checkout/
 │  ├─ ContactForm.tsx  AuthCard.tsx  SignOutButton.tsx
 ├─ lib/
 │  ├─ supabase/{client,server,admin}.ts   auth.ts   validation.ts
-│  ├─ money.ts   fx.ts   pricing.ts   paystack.ts   orders.ts
+│  ├─ money.ts   fx.ts   pricing.ts   payments.ts   paystack.ts   flutterwave.ts   orders.ts   redirect.ts
 │  ├─ email/{resend,templates}.ts   utils.ts   constants.ts   types.ts   adminApi.ts
 ├─ proxy.ts                 # Next 16 route protection (replaces middleware.ts)
 ├─ supabase/{schema.sql,seed.sql}
@@ -234,10 +267,11 @@ naasify/
 
 - redirects unauthenticated visitors from `/dashboard*` → `/login?next=…`
 - redirects non-admins from `/admin*` → `/dashboard`
-- redirects signed-in users from `/login`/`/signup` → `/dashboard`
+- redirects signed-in users from `/login`/`/signup` → their landing page (admins →
+  `/admin`, everyone else → `/dashboard`, honouring a safe `?next`)
 
 The matcher excludes `_next/static`, `_next/image`, `favicon.ico`, `logo.png`,
-and `api/webhooks` (so the Paystack signature body is never altered).
+and `api/webhooks` (so the gateway signature/hash bodies are never altered).
 
 ---
 
@@ -248,12 +282,15 @@ and `api/webhooks` (so the Paystack signature body is never altered).
 2. Add environment variables in the Vercel project settings. Keep the
    **server-only secrets** out of any `NEXT_PUBLIC_` prefix:
    - `SUPABASE_SERVICE_ROLE_KEY`
+   - `FLW_SECRET_KEY`, `FLW_SECRET_HASH`
    - `PAYSTACK_SECRET_KEY`
    - `RESEND_API_KEY`
    - plus `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
      `NEXT_PUBLIC_APP_URL` (set to your production URL), and the optional
-     `FX_*` / `CONTACT_TO_EMAIL` / `RESEND_FROM_EMAIL`.
-3. Update the Paystack webhook URL to
+     `PAYMENT_GATEWAY` / `FX_*` / `CONTACT_TO_EMAIL` / `RESEND_FROM_EMAIL`.
+3. Update the webhook URLs to
+   `https://<your-production-domain>/api/webhooks/flutterwave` (set the dashboard
+   secret hash to `FLW_SECRET_HASH`) and
    `https://<your-production-domain>/api/webhooks/paystack`.
 4. Verify the `naasify.online` domain in Resend before going live.
 

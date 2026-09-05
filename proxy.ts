@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { resolvePostAuthPath } from "@/lib/redirect";
 
 /**
  * Next 16 proxy (the renamed middleware convention — middleware.ts is
@@ -62,10 +63,17 @@ export async function proxy(request: NextRequest) {
   }
 
   if (user && (path === "/login" || path === "/signup")) {
-    const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = "/dashboard";
-    redirectUrl.search = "";
-    return NextResponse.redirect(redirectUrl);
+    // Bounce signed-in visitors to their proper landing page, honouring a safe
+    // ?next deep-link (e.g. /checkout/start?planId=…) and the admin role.
+    const next = request.nextUrl.searchParams.get("next");
+    const { data: profile } = await supabase
+      .from("naasify_profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle();
+    return NextResponse.redirect(
+      new URL(resolvePostAuthPath(profile?.role, next), request.url),
+    );
   }
 
   if (user && (path === "/admin" || path.startsWith("/admin/"))) {

@@ -47,9 +47,14 @@ export const planSchema = z.object({
 export type PlanInput = z.infer<typeof planSchema>;
 export const planUpdateSchema = planSchema.partial();
 
-export const checkoutSchema = z.object({
+/**
+ * GET /checkout/start query. `planId` selects the plan; `return` is the safe
+ * relative path to bounce back to on a recoverable error (guarded by
+ * safeNextPath in the route). Login is enforced separately.
+ */
+export const startCheckoutSchema = z.object({
   planId: z.string().uuid(),
-  email: z.email().optional(),
+  return: z.string().max(300).optional(),
 });
 
 export const messageStatusSchema = z.object({

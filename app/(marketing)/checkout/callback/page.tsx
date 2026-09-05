@@ -16,25 +16,48 @@ export const metadata: Metadata = buildMetadata({
   noIndex: true,
 });
 
-type Status = "paid" | "pending" | "not_found";
+type Status = "paid" | "pending" | "failed" | "not_found";
 
 /**
- * Paystack redirects the buyer here after payment (?reference=…). We confirm
+ * The gateway redirects the buyer here after payment — Paystack with
+ * ?reference=…, Flutterwave with ?tx_ref=&transaction_id=&status=…. We confirm
  * server-side immediately (idempotent) so activation never depends on the
- * webhook arriving first — the webhook and this page both funnel through
- * confirmAndActivate.
+ * webhook arriving first; both funnel through confirmAndActivate.
  */
 export default async function CheckoutCallbackPage({
   searchParams,
 }: {
-  searchParams: Promise<{ reference?: string }>;
+  searchParams: Promise<{
+    reference?: string;
+    tx_ref?: string;
+    transaction_id?: string;
+    status?: string;
+  }>;
 }) {
-  const { reference } = await searchParams;
+  const {
+    reference,
+    tx_ref,
+    transaction_id,
+    status: redirectStatus,
+  } = await searchParams;
+  // Paystack sends ?reference=; Flutterwave sends ?tx_ref=&transaction_id=.
+  const merchantRef = reference ?? tx_ref;
 
   let status: Status = "not_found";
-  if (reference) {
-    const result = await confirmAndActivate(reference);
-    status = result.status;
+  if (merchantRef) {
+    const result = await confirmAndActivate(merchantRef, undefined, {
+      providerTransactionId: transaction_id,
+    });
+    // The gateway's own redirect status lets us show a definitive "failed"
+    // instead of an endless "pending" when the buyer cancelled or was declined.
+    if (
+      result.status !== "paid" &&
+      (redirectStatus === "failed" || redirectStatus === "cancelled")
+    ) {
+      status = "failed";
+    } else {
+      status = result.status;
+    }
   }
 
   return (
@@ -50,21 +73,25 @@ export default async function CheckoutCallbackPage({
                 ? "Payment confirmed"
                 : status === "pending"
                   ? "Confirming your payment"
-                  : "We couldn't find that payment"}
+                  : status === "failed"
+                    ? "Payment not confirmed"
+                    : "We couldn't find that payment"}
             </h1>
 
             <p className="mx-auto mt-3 max-w-md text-sm text-foreground/60">
               {status === "paid"
                 ? "Your plan is active and a receipt is on its way to your inbox. You can manage everything from your dashboard."
                 : status === "pending"
-                  ? "We're waiting on Paystack to finalise this charge. This usually takes a few seconds."
-                  : "This checkout link is missing a valid reference. Start a new checkout from the pricing page."}
+                  ? "We're waiting on your payment provider to finalise this charge. This usually takes a few seconds."
+                  : status === "failed"
+                    ? "We couldn't confirm this payment. If your card was charged it can take a few minutes to reflect — try the re-check below, or start a new checkout."
+                    : "This checkout link is missing a valid reference. Start a new checkout from the pricing page."}
             </p>
 
-            {reference && (
+            {merchantRef && (
               <p className="mt-5 inline-flex items-center gap-2 rounded-full bg-foreground/5 px-4 py-1.5 font-mono text-xs text-foreground/45">
                 <Icon name="credit-card" className="h-3.5 w-3.5" />
-                {reference}
+                {merchantRef}
               </p>
             )}
 
@@ -77,7 +104,11 @@ export default async function CheckoutCallbackPage({
                   </span>
                 </Link>
               ) : (
-                <ReCheckButton reference={reference ?? ""} initialStatus={status} />
+                <ReCheckButton
+                  reference={merchantRef ?? ""}
+                  transactionId={transaction_id}
+                  initialStatus={status}
+                />
               )}
             </div>
           </div>
@@ -99,6 +130,13 @@ function StatusIcon({ status }: { status: Status }) {
     return (
       <span className="pill mx-auto inline-flex bg-accent-500/15 p-4 text-accent-300 ring-1 ring-accent-400/30">
         <Icon name="clock" className="h-8 w-8 animate-pulse" />
+      </span>
+    );
+  }
+  if (status === "failed") {
+    return (
+      <span className="pill mx-auto inline-flex bg-red-500/15 p-4 text-red-300 ring-1 ring-red-400/30">
+        <Icon name="x" className="h-8 w-8" />
       </span>
     );
   }

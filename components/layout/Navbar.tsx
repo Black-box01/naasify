@@ -24,6 +24,7 @@ export function Navbar() {
   const [open, setOpen] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
   const [ready, setReady] = useState(false);
+  const [role, setRole] = useState<string | null>(null);
   const [lastPath, setLastPath] = useState(pathname);
 
   // Close the mobile sheet on route change during render (the documented
@@ -35,15 +36,39 @@ export function Navbar() {
   }
 
   useEffect(() => {
+    let active = true;
     const supabase = createSupabaseBrowserClient();
+
+    // Fetch the signed-in user's role so admins get an /admin shortcut. The
+    // `active` flag avoids setting state after unmount (React Compiler rule).
+    async function loadRole(userId: string | undefined) {
+      if (!userId) {
+        if (active) setRole(null);
+        return;
+      }
+      const { data } = await supabase
+        .from("naasify_profiles")
+        .select("role")
+        .eq("id", userId)
+        .maybeSingle();
+      if (active) setRole(data?.role ?? null);
+    }
+
     supabase.auth.getSession().then(({ data }) => {
+      if (!active) return;
       setSignedIn(!!data.session);
       setReady(true);
+      void loadRole(data.session?.user.id);
     });
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!active) return;
       setSignedIn(!!session);
+      void loadRole(session?.user.id);
     });
-    return () => listener.subscription.unsubscribe();
+    return () => {
+      active = false;
+      listener.subscription.unsubscribe();
+    };
   }, []);
 
   return (
@@ -89,6 +114,14 @@ export function Navbar() {
           <ThemeToggle />
           {ready && signedIn ? (
             <>
+              {role === "admin" && (
+                <Link href="/admin">
+                  <Button variant="glass" size="sm">
+                    <Icon name="shield" className="h-4 w-4" />
+                    Admin
+                  </Button>
+                </Link>
+              )}
               <Link href="/dashboard">
                 <Button variant="glass" size="sm">
                   <Icon name="dashboard" className="h-4 w-4" />
@@ -140,9 +173,16 @@ export function Navbar() {
                 <ThemeToggle />
               </div>
               {ready && signedIn ? (
-                <Link href="/dashboard">
-                  <Button variant="glass" size="md" className="w-full">Dashboard</Button>
-                </Link>
+                <>
+                  {role === "admin" && (
+                    <Link href="/admin">
+                      <Button variant="glass" size="md" className="w-full">Admin</Button>
+                    </Link>
+                  )}
+                  <Link href="/dashboard">
+                    <Button variant="glass" size="md" className="w-full">Dashboard</Button>
+                  </Link>
+                </>
               ) : (
                 <Link href="/login">
                   <Button variant="glass" size="md" className="w-full">Sign in</Button>

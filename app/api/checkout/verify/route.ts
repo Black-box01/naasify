@@ -6,12 +6,15 @@ export const dynamic = "force-dynamic";
 
 const verifySchema = z.object({
   reference: z.string().min(4).max(200),
+  // Flutterwave's numeric transaction id (optional); lets verification hit the
+  // exact transaction instead of a tx_ref list lookup.
+  transactionId: z.string().max(64).optional(),
 });
 
 /**
  * Safety net for local/dev (or any moment the webhook is unreachable): the
  * callback page's ReCheckButton POSTs here to re-run confirmAndActivate, which
- * verifies the charge straight with Paystack and is fully idempotent.
+ * verifies the charge straight with the order's gateway and is fully idempotent.
  */
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
@@ -24,7 +27,9 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const result = await confirmAndActivate(parsed.data.reference);
+    const result = await confirmAndActivate(parsed.data.reference, undefined, {
+      providerTransactionId: parsed.data.transactionId,
+    });
     return NextResponse.json({ status: result.status });
   } catch (error) {
     console.error(

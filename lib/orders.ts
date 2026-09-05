@@ -1,15 +1,12 @@
 import { createServiceClient } from "@/lib/supabase/admin";
 import { getNgnPerUsd } from "@/lib/fx";
-import {
-  initializeTransaction,
-  makeReference,
-  verifyTransaction,
-} from "@/lib/paystack";
+import { makeReference } from "@/lib/paystack";
+import { activeGatewayName, initializeCharge, verifyCharge } from "@/lib/payments";
 import { sendEmail } from "@/lib/email/resend";
 import { paymentReceiptEmail } from "@/lib/email/templates";
 import { CYCLE_MONTHS } from "@/lib/constants";
 import { addMonths } from "@/lib/utils";
-import type { BillingCycle, CurrencyCode, Plan } from "@/lib/types";
+import type { BillingCycle, CurrencyCode, GatewayName, Plan } from "@/lib/types";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
@@ -24,20 +21,29 @@ function planAmountKobo(plan: Plan, ngnPerUsd: number): { amountNgn: number; kob
 }
 
 /**
- * Create a pending order (amount recomputed from the DB plan) and start a
- * Paystack charge. Returns the hosted-checkout URL to redirect the buyer to.
+ * Create a pending order (amount recomputed from the DB plan) and start a charge
+ * on the active gateway. Returns the hosted-checkout URL to redirect the buyer
+ * to, plus the gateway chosen so callers can reason about the flow.
  */
 export async function createOrder({
   plan,
   userId,
   email,
+  customerName,
 }: {
   plan: Plan;
   userId: string | null;
   email: string;
-}): Promise<{ authorization_url: string; reference: string; orderId: string }> {
+  customerName?: string;
+}): Promise<{
+  authorization_url: string;
+  reference: string;
+  orderId: string;
+  gateway: GatewayName;
+}> {
   const ngnPerUsd = await getNgnPerUsd();
   const { amountNgn, kobo } = planAmountKobo(plan, ngnPerUsd);
+  const gateway = activeGatewayName();
   const reference = makeReference();
 
   const supabase = createServiceClient();
@@ -51,6 +57,7 @@ export async function createOrder({
       amount: amountNgn.toFixed(2),
       currency: "NGN",
       paystack_reference: reference,
+      gateway,
       status: "pending",
     })
     .select()
@@ -59,18 +66,23 @@ export async function createOrder({
     throw new Error(error?.message || "Could not create the order");
   }
 
-  const init = await initializeTransaction({
+  const { authorizationUrl } = await initializeCharge({
+    gateway,
     email,
-    amountKobo: kobo,
+    customerName,
+    amountMajor: amountNgn,
+    amountMinor: kobo,
+    currency: "NGN",
     reference,
-    callbackUrl: `${APP_URL}/checkout/callback?reference=${encodeURIComponent(reference)}`,
+    callbackBaseUrl: `${APP_URL}/checkout/callback`,
     metadata: { order_id: order.id as string, plan_name: plan.name },
   });
 
   return {
-    authorization_url: init.authorization_url,
+    authorization_url: authorizationUrl,
     reference,
     orderId: order.id as string,
+    gateway,
   };
 }
 
@@ -87,35 +99,27 @@ type OrderWithPlan = {
   billing_cycle: BillingCycle;
   amount: string;
   currency: string;
+  gateway: GatewayName;
+  provider_transaction_id?: string | null;
   status: string;
   plan: Plan | null;
 };
 
 /**
- * Verify a charge with Paystack and, if successful, activate it — used by BOTH
- * the webhook and the callback page. Idempotent by construction:
+ * Verify a charge on its own gateway and, if successful, activate it — used by
+ * BOTH the webhooks and the callback page. The order is loaded FIRST so we know
+ * which gateway to verify against. Idempotent by construction:
  *   1. conditional UPDATE ... WHERE status <> 'paid' (0 rows ⇒ already paid)
  *   2. subscriptions.order_id UNIQUE (duplicate insert is a no-op)
- * A receipt email fires only on the transition to paid.
+ * A receipt email fires only on the transition to paid. An amount/currency guard
+ * refuses to activate an under-paid or mismatched-currency charge.
  */
 export async function confirmAndActivate(
   reference: string,
   rawEvent?: Record<string, unknown>,
+  opts?: { providerTransactionId?: string },
 ): Promise<ConfirmResult> {
   const supabase = createServiceClient();
-
-  let txn;
-  try {
-    txn = await verifyTransaction(reference);
-  } catch (error) {
-    console.log(
-      `[orders] verify failed for ${reference}: ${error instanceof Error ? error.message : "unknown"}`,
-    );
-    return { status: "pending" };
-  }
-  if (txn.status !== "success") {
-    return { status: "pending" };
-  }
 
   const { data: order } = await supabase
     .from("naasify_orders")
@@ -123,7 +127,7 @@ export async function confirmAndActivate(
     .eq("paystack_reference", reference)
     .maybeSingle();
   if (!order) {
-    console.log(`[orders] no order for verified reference ${reference}`);
+    console.log(`[orders] no order for reference ${reference}`);
     return { status: "not_found" };
   }
   const existing = order as OrderWithPlan;
@@ -131,13 +135,45 @@ export async function confirmAndActivate(
     return { status: "paid", orderId: existing.id };
   }
 
-  // 1) Conditional flip to paid — races lose here and become no-ops.
+  let result;
+  try {
+    result = await verifyCharge({
+      gateway: existing.gateway,
+      reference,
+      providerTransactionId: opts?.providerTransactionId,
+    });
+  } catch (error) {
+    console.log(
+      `[orders] verify failed for ${reference}: ${error instanceof Error ? error.message : "unknown"}`,
+    );
+    return { status: "pending" };
+  }
+  if (result.status !== "success") {
+    return { status: "pending" };
+  }
+
+  // Amount/currency guard: never activate an under-paid or wrong-currency charge.
+  if (
+    result.currency !== existing.currency ||
+    result.amountMajor + 0.01 < Number(existing.amount)
+  ) {
+    console.log(
+      `[orders] amount/currency mismatch for ${reference}: got ${result.amountMajor} ${result.currency}, expected ${existing.amount} ${existing.currency}`,
+    );
+    return { status: "pending" };
+  }
+
+  // 1) Conditional flip to paid — races lose here and become no-ops. The
+  //    provider transaction id (Flutterwave) is stamped for audit when present.
   const { data: updated } = await supabase
     .from("naasify_orders")
     .update({
       status: "paid",
       paid_at: new Date().toISOString(),
       raw_event: rawEvent ?? {},
+      ...(result.providerTransactionId
+        ? { provider_transaction_id: result.providerTransactionId }
+        : {}),
     })
     .eq("paystack_reference", reference)
     .neq("status", "paid")
